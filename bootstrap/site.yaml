@@ -1,0 +1,50 @@
+---
+
+- name: Create Talos ControlPlane on proxmox virtual machine
+  hosts: localhost
+  roles:
+    - create_controlpanes
+    - initialize_talos_configuration
+  vars:
+    proxmox:
+      host: pve.home
+      node: pve
+      storage: local-zfs
+      networkbridge: vmbr0
+      user: root@pam
+      password: Kbchilwl80
+
+    talos:
+      iso: "local:iso/talos-v1.10.2-metal-amd64.iso"
+
+      domain_name: home
+      cluster_name: k8s
+      endpoint: https://kube.home:6443
+      secrets_path: secrets.yaml
+      boot_disk: /dev/vda
+
+      machine:
+        type: q35
+        os: l26
+        vga: qxl
+        agent: true
+
+      controlpane:
+        cpu:
+          type: "host,flags=+aes"
+          cores: 6
+          shares: 1000
+        memory:
+          balloon: 1024
+          limit: 16384
+
+    controlpanes:
+      - name: talos1
+        vmid: 401
+        mac: 54:52:00:AA:BB:01
+      - name: talos2
+        vmid: 402
+        mac: 54:52:00:AA:BB:02
+      - name: talos3
+        vmid: 403
+        mac: 54:52:00:AA:BB:03

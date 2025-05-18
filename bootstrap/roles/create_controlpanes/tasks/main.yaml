@@ -1,0 +1,68 @@
+# Port 50000 is open - VM started
+# Port 10250 and 50001 is open - Apply config done
+# Port 6443 is open - bootstrap is done
+# 1. Spin up VMs
+# 2. Wait for only 50000 port
+# 3. Apply Config if
+# 4. Wait for port 10250 open on first node
+# 6. Wait for port 6443 open on all nodes
+
+- name: Create ControlPane Virtual Machine
+  community.general.proxmox_kvm:
+    api_user: '{{ proxmox.user }}'
+    api_password: '{{ proxmox.password }}'
+    api_host: '{{ proxmox.host }}'
+    node: '{{ proxmox.node }}'
+
+    vmid: "{{ item['vmid'] }}"
+    name: "{{ item['name'] }}"
+    cpu: "{{ talos.controlpane.cpu.type }}"
+    cores: "{{ talos.controlpane.cpu.cores }}"
+    shares: "{{ talos.controlpane.cpu.shares }}"
+    balloon: "{{ talos.controlpane.memory.balloon }}"
+    memory: "{{ talos.controlpane.memory.limit }}"
+    machine: "{{ talos.machine.type }}"
+    ostype: "{{ talos.machine.os }}"
+    vga: "{{ talos.machine.vga }}"
+    agent: "{{ talos.machine.agent }}"
+
+    onboot: true
+    startup:
+      order=2
+
+    scsihw: virtio-scsi-single
+
+    virtio:
+      virtio0: '{{ proxmox.storage }}:32,iothread=1'
+    sata:
+      sata0: "{{ talos.iso }},media=cdrom"
+    net:
+      net0: "virtio={{ item['mac'] }},bridge={{ proxmox.networkbridge }}"
+  with_items: "{{ controlpanes }}"
+
+- name: Start ControlPane Virtual Machines
+  community.general.proxmox_kvm:
+    api_user: '{{ proxmox.user }}'
+    api_password: '{{ proxmox.password }}'
+    api_host: '{{ proxmox.host }}'
+    node: '{{ proxmox.node }}'
+
+    vmid: "{{ item['vmid'] }}"
+    state: started
+  with_items: "{{ controlpanes }}"
+
+- name: Re-read facts
+  ansible.builtin.setup:
+    filter: ansible_local
+
+- name: Wait for vm is running
+  ansible.builtin.wait_for:
+    port: 50000
+    host: "{{ item['name'] }}"
+  with_items: "{{ controlpanes }}"
+
+- name: Add to inventory
+  ansible.builtin.add_host:
+    name: "{{ item['name'] }}.{{ talos.domain_name }}"
+  changed_when: false
+  with_items: "{{ controlpanes }}"

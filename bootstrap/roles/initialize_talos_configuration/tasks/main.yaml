@@ -1,0 +1,50 @@
+---
+
+- name: Generate configuration using secrets.yaml
+  connection: local
+  ansible.builtin.shell: "talosctl gen config {{ talos.cluster_name }} {{ talos.endpoint }} --with-secrets {{ talos.secrets_path }} --with-examples=false --with-docs=false --install-disk {{ talos.boot_disk }} --additional-sans {{ groups['all'] | join(',') }} --force"
+
+- name: Update talosconfig with first endpoint
+  connection: local
+  ansible.builtin.shell: "talosctl --talosconfig talosconfig config endpoint {{ groups['all'][0] }}"
+
+- name: Apply Talos configuration controlplane nodes
+  ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ item }} apply --insecure -f controlplane.yaml -p @patch/extensions.yaml -p @patch/allow-scheduling.yaml"
+  with_items: "{{ groups['all'] }}"
+
+- name: Wait for Talos install to be ready
+  ansible.builtin.wait_for:
+    host: "{{ item }}"
+    port: 50001
+  with_items: "{{ groups['all'] }}"
+
+- name: Bootstrap on the first node
+  ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ groups['all'][0] }} bootstrap"
+
+- name: Wait for Talos boostrap to be completed (kubeapi is ready)
+  ansible.builtin.wait_for:
+    host: "{{ item }}"
+    port: 6443
+  with_items: "{{ groups['all'] }}"
+
+- name: Update talosconfig with endpoint
+  connection: local
+  ansible.builtin.shell: "talosctl --talosconfig talosconfig config endpoint {{ groups['all'] | join(' ') }}"
+
+- name: Start provisioning job in the cluster
+  ansible.builtin.shell: "talosctl --talosconfig talosconfig -n {{ groups['all'] | join(',') }} patch machineconfig --patch @patch/provision.yaml"
+
+- name: Create \$HOME/.talos directory if it doesn't exist
+  ansible.builtin.file:
+    path: "$HOME/.talos"
+    state: directory
+
+- name: Copy talosconfig to \$HOME/.talos/config
+  connection: local
+  ansible.builtin.copy:
+    src: talosconfig
+    dest: "$HOME/.talos/config"
+
+- name: Generate kubectl config
+  connection: local
+  ansible.builtin.shell: "talosctl --nodes {{ groups['all'][0] }} --endpoints {{ groups['all'][0] }} kubeconfig"

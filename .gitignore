@@ -1,0 +1,6 @@
+.python-version
+bootstrap/secrets.yaml
+bootstrap/controlplane.yaml
+bootstrap/worker.yaml
+bootstrap/talosconfig
+bootstrap/patch/provision.yaml
