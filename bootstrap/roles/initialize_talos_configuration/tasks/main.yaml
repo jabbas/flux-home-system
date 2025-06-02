@@ -31,8 +31,8 @@
   connection: local
   ansible.builtin.shell: "talosctl --talosconfig talosconfig config endpoint {{ groups['all'] | join(' ') }}"
 
-# - name: Start provisioning job in the cluster
-#   ansible.builtin.shell: "talosctl --talosconfig talosconfig -n {{ groups['all'] | join(',') }} patch machineconfig --patch @patch/provision.yaml"
+- name: Start provisioning job in the cluster
+  ansible.builtin.shell: "talosctl --talosconfig talosconfig -n {{ groups['all'] | join(',') }} patch machineconfig --patch @patch/provision.yaml"
 
 - name: Create \$HOME/.talos directory if it doesn't exist
   ansible.builtin.file:
