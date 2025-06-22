@@ -13,3 +13,21 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./flux/infrastructure
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-config
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  timeout: 2m0s
+  wait: true
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure-config
+  dependsOn:
+    - name: infrastructure
