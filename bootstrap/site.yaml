@@ -15,7 +15,7 @@
       password: Kbchilwl80
 
     talos:
-      iso: "local:iso/talos-v1.10.4-metal-amd64.iso"
+      iso: "local:iso/talos-v1.10.5-metal-amd64.iso"
 
       domain_name: home
       cluster_name: k8s
