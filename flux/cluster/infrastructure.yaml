@@ -1,4 +1,48 @@
 ---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: metallb
+  namespace: flux-system
+spec:
+  interval: 24h
+  url: https://metallb.github.io/metallb
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: metallb-release
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  timeout: 2m0s
+  wait: true
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/metallb/release
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: metallb-config
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  timeout: 2m0s
+  wait: true
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/metallb/config
+  dependsOn:
+    - name: metallb-release
+
+---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -13,21 +57,5 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./flux/infrastructure
-
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: infrastructure-config
-  namespace: flux-system
-spec:
-  interval: 1m0s
-  timeout: 2m0s
-  wait: true
-  prune: true
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-  path: ./flux/infrastructure-config
   dependsOn:
-    - name: infrastructure
+    - name: metallb-config

@@ -9,7 +9,7 @@
   ansible.builtin.shell: "talosctl --talosconfig talosconfig config endpoint {{ groups['all'][0] }}"
 
 - name: Apply Talos configuration controlplane nodes
-  ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ item }} apply --insecure -f controlplane.yaml -p @patch/extensions.yaml -p @patch/allow-scheduling.yaml"
+  ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ item }} apply --insecure -f controlplane.yaml -p @patch/extensions.yaml -p @patch/allow-scheduling.yaml -p @patch/remove-externallb-label.yaml"
   with_items: "{{ groups['all'] }}"
 
 - name: Wait for Talos install to be ready
