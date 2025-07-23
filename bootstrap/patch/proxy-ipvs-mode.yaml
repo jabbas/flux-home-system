@@ -1,0 +1,7 @@
+---
+cluster:
+  proxy:
+    mode: ipvs
+    extraArgs:
+      proxy-mode: ipvs
+      ipvs-strict-arp: true

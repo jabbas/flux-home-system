@@ -8,31 +8,42 @@
   connection: local
   ansible.builtin.shell: "talosctl --talosconfig talosconfig config endpoint {{ groups['all'][0] }}"
 
-- name: Apply Talos configuration controlplane nodes
-  ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ item }} apply --insecure -f controlplane.yaml -p @patch/extensions.yaml -p @patch/allow-scheduling.yaml -p @patch/remove-externallb-label.yaml"
-  with_items: "{{ groups['all'] }}"
+- name: Check if nodes is already provisioned
+  block:
+    - name: Get version
+      ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ item }} get version -o jsonpath='{.node}'"
+      register: node_versions
+      loop: "{{ groups['all'] }}"
+      ignore_errors: true
+      changed_when: false
+    - name: Prepare the dict of already provisioned nodes
+      set_fact:
+        already_provisioned_nodes: "{{ already_provisioned_nodes | default({}) | combine({ (item.item): (item.item == item.stdout) }) }}"
+      loop: "{{ node_versions.results }}"
+
+- name: Apply patches
+  ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ item }} apply {{ '--insecure' if not already_provisioned_nodes[item] else '' }} -f controlplane.yaml -p @patch/extensions.yaml -p @patch/allow-scheduling.yaml -p @patch/remove-externallb-label.yaml"
+  loop: "{{ groups['all'] }}"
 
 - name: Wait for Talos install to be ready
   ansible.builtin.wait_for:
     host: "{{ item }}"
     port: 50001
-  with_items: "{{ groups['all'] }}"
+  loop: "{{ groups['all'] }}"
 
 - name: Bootstrap on the first node
   ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ groups['all'][0] }} bootstrap"
+  when: already_provisioned_nodes.values() |select('equalto', false) |list |length==already_provisioned_nodes |length
 
 - name: Wait for Talos boostrap to be completed (kubeapi is ready)
   ansible.builtin.wait_for:
     host: "{{ item }}"
     port: 6443
-  with_items: "{{ groups['all'] }}"
+  loop: "{{ groups['all'] }}"
 
 - name: Update talosconfig with endpoint
   connection: local
   ansible.builtin.shell: "talosctl --talosconfig talosconfig config endpoint {{ groups['all'] | join(' ') }}"
-
-- name: Start provisioning job in the cluster
-  ansible.builtin.shell: "talosctl --talosconfig talosconfig -n {{ groups['all'] | join(',') }} patch machineconfig --patch @patch/provision.yaml"
 
 - name: Create \$HOME/.talos directory if it doesn't exist
   ansible.builtin.file:
@@ -48,3 +59,10 @@
 - name: Generate kubectl config
   connection: local
   ansible.builtin.shell: "talosctl --nodes {{ groups['all'][0] }} --endpoints {{ groups['all'][0] }} kubeconfig"
+
+- name: Provision it with flux
+  connection: local
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ item }}"
+  loop: "{{ lookup('fileglob', playbook_dir + '/provision/*.yaml', wantlist=True) | sort }}"

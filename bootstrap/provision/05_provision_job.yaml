@@ -1,0 +1,45 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: flux-provisioner
+  namespace: flux-system
+spec:
+  template:
+    spec:
+      serviceAccountName: provisioner
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      restartPolicy: OnFailure
+      volumes:
+        - name: github
+          secret:
+            secretName: flux-system
+            defaultMode: 256
+      containers:
+        - name: flux
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ['ALL']
+            runAsNonRoot: true
+          image: fluxcd/flux-cli:v2.6.4
+          volumeMounts:
+            - name: github
+              readOnly: true
+              mountPath: "/ssh"
+          startupProbe:
+            exec:
+              command: ["kubectl", "-n", "kube-system", "wait", "--for=condition=available", "deployment/coredns", "--timeout=60s"]
+          args:
+            - bootstrap
+            - git
+            - --silent
+            - --url=ssh://git@github.com/jabbas/homek8s-flux.git
+            - --branch=main
+            - --private-key-file=/ssh/identity
+            - --path=flux/cluster
