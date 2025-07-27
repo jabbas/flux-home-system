@@ -1,3 +1,4 @@
+---
 # Port 50000 is open - VM started
 # Port 10250 and 50001 is open - Apply config done
 # Port 6443 is open - bootstrap is done
@@ -6,6 +7,29 @@
 # 3. Apply Config if
 # 4. Wait for port 10250 open on first node
 # 6. Wait for port 6443 open on all nodes
+
+- name: Check if Talos Linux ISO exists locally
+  ansible.builtin.stat:
+    path: "./talos-{{ talos.version }}-{{ talos.schematic_id }}-metal-amd64.iso"
+  register: iso_file
+
+- name: Fetch Talos Linux ISO
+  ansible.builtin.get_url:
+    url: "https://factory.talos.dev/image/{{ talos.schematic_id }}/v{{ talos.version }}/metal-amd64.iso"
+    dest: "./talos-{{ talos.version }}-{{ talos.schematic_id }}-metal-amd64.iso"
+  when: not iso_file.stat.exists
+
+- name: Put Talos Linux ISO into proxmox
+  community.proxmox.proxmox_template:
+    api_user: '{{ proxmox.user }}'
+    api_password: '{{ proxmox.password }}'
+    api_host: '{{ proxmox.host }}'
+    node: '{{ proxmox.node }}'
+
+    storage: local
+    content_type: iso
+    force: true
+    src: "./talos-{{ talos.version }}-{{ talos.schematic_id }}-metal-amd64.iso"
 
 - name: Create ControlPane Virtual Machine
   community.general.proxmox_kvm:
@@ -35,7 +59,7 @@
     virtio:
       virtio0: '{{ proxmox.storage }}:32,iothread=1'
     sata:
-      sata0: "{{ talos.iso }},media=cdrom"
+      sata0: "local:iso/talos-{{ talos.version }}-{{ talos.schematic_id }}-metal-amd64.iso,media=cdrom"
     net:
       net0: "virtio={{ item['mac'] }},bridge={{ proxmox.networkbridge }}"
   with_items: "{{ controlpanes }}"

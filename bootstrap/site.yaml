@@ -15,7 +15,8 @@
       password: Kbchilwl80
 
     talos:
-      iso: "local:iso/talos-v1.10.5-metal-amd64.iso"
+      schematic_id: ce4c980550dd2ab1b17bbf2b08801c7eb59418eafe8f279833297925d67c7515
+      version: 1.10.5
 
       domain_name: home
       cluster_name: k8s

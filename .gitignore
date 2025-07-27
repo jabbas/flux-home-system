@@ -5,3 +5,4 @@ bootstrap/worker.yaml
 bootstrap/talosconfig
 bootstrap/patch/provision.yaml
 bootstrap/provision/*secret*
+*.iso
