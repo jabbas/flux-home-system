@@ -37,10 +37,3 @@ spec:
       default:
         defaultCertificate:
           secretName: dev-home-default-certificate
-    ports:
-      web:
-        redirections:
-          entryPoint:
-            scheme: https
-            to: websecure
-            permanent: true
