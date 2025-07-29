@@ -1,12 +1,36 @@
 ---
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
 metadata:
-  name: metallb
+  name: sources
   namespace: flux-system
 spec:
-  interval: 24h
-  url: https://metallb.github.io/metallb
+  interval: 1m0s
+  timeout: 2m0s
+  wait: true
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/sources
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: metrics-server
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  timeout: 2m0s
+  wait: true
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/metrics-server
+  dependsOn:
+    - name: sources
 
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -23,6 +47,8 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./flux/infrastructure/metallb/release
+  dependsOn:
+    - name: sources
 
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -40,6 +66,7 @@ spec:
     name: flux-system
   path: ./flux/infrastructure/metallb/config
   dependsOn:
+    - name: sources
     - name: metallb-release
 
 ---
@@ -57,6 +84,8 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./flux/infrastructure
+  dependsOn:
+    - name: sources
 
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -73,6 +102,8 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./flux/infrastructure/sealed-secrets
+  dependsOn:
+    - name: sources
 
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -90,5 +121,6 @@ spec:
     name: flux-system
   path: ./flux/infrastructure/traefik
   dependsOn:
+    - name: sources
     - name: sealed-secrets
     - name: metallb-config
