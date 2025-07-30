@@ -109,6 +109,25 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
+  name: democratic-csi
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  timeout: 2m0s
+  wait: true
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/democratic-csi
+  dependsOn:
+    - name: sources
+    - name: sealed-secrets
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
   name: traefik
   namespace: flux-system
 spec:

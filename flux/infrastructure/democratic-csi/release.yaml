@@ -1,0 +1,38 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: democratic-csi
+  namespace: democratic-system
+spec:
+  chart:
+    spec:
+      chart: democratic-csi
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: democratic-csi
+        namespace: flux-system
+  interval: 1m0s
+  values:
+    csiDriver:
+      name: "org.democratic-csi.nfs"
+      fsGroupPolicy: File
+
+    driver:
+      config:
+        driver: zfs-generic-nfs
+      existingConfigSecret: csi-zfs-pve-ssd
+
+    storageClasses:
+      - name: zfs-nfs-csi
+        defaultClass: true
+        reclaimPolicy: Delete
+        volumeBindingMode: Immediate
+        allowVolumeExpansion: true
+        parameters:
+          fsType: nfs
+        mountOptions:
+          - noatime
+          - nolock
+          # - nfsvers=3
