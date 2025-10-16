@@ -16,7 +16,7 @@
 
     talos:
       schematic_id: ce4c980550dd2ab1b17bbf2b08801c7eb59418eafe8f279833297925d67c7515
-      version: 1.10.5
+      version: 1.11.3
 
       domain_name: home
       cluster_name: k8s
@@ -32,8 +32,8 @@
 
       controlpane:
         cpu:
-          type: "host,flags=+aes"
-          cores: 6
+          type: "host"
+          cores: 18
           shares: 1000
         memory:
           balloon: 1024
