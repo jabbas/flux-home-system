@@ -1,0 +1,23 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: httpbin
+  namespace: demos
+spec:
+  chart:
+    spec:
+      chart: httpbin
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: httpbin
+  interval: 1m0s
+  values:
+    ingress:
+      enabled: true
+      hosts:
+        - host: httpbin.jabbas.eu
+          paths:
+            - path: /
+              pathType: ImplementationSpecific

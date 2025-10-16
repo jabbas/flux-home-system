@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - sources.yaml
+  - httpbin.yaml
