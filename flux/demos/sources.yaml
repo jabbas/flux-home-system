@@ -1,0 +1,9 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: httpbin
+  namespace: demos
+spec:
+  interval: 24h
+  url: https://jabbas.github.io/chart-httpbin/
