@@ -4,4 +4,5 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - dev-home-default-certificate.yaml
-  - release.yaml
+  - release-external.yaml
+  - release-internal.yaml

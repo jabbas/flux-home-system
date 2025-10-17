@@ -1,0 +1,41 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: traefik
+  namespace: traefik-system
+spec:
+  chart:
+    spec:
+      chart: traefik
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: traefik
+        namespace: flux-system
+  interval: 1m0s
+  values:
+    deployment:
+      kind: DaemonSet
+    globalArguments:
+      - '--entrypoints.web.forwardedHeaders.trustedIPs=10.1.255.2,185.170.224.141'
+    logs:
+      general:
+        level: ERROR
+      access:
+        enabled: false
+      fields:
+        headers:
+          defaultmode: keep
+    podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+    ingressClass:
+      isDefaultClass: false
+    service:
+      spec:
+        loadBalancerIP: 10.1.200.0
+    tlsStore:
+      default:
+        defaultCertificate:
+          secretName: dev-home-default-certificate

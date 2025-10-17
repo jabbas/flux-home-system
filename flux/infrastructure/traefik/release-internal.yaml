@@ -2,7 +2,7 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: traefik
+  name: traefik-internal
   namespace: traefik-system
 spec:
   chart:
@@ -32,7 +32,7 @@ spec:
         type: RuntimeDefault
     service:
       spec:
-        loadBalancerIP: 10.1.200.0
+        loadBalancerIP: 10.1.200.1
     tlsStore:
       default:
         defaultCertificate:
