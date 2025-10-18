@@ -1,0 +1,34 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: headlamp
+  namespace: internal-apps
+spec:
+  interval: 24h
+  url: https://kubernetes-sigs.github.io/headlamp/
+
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: headlamp
+  namespace: internal-apps
+spec:
+  chart:
+    spec:
+      chart: headlamp
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: headlamp
+  interval: 1m0s
+  values:
+    ingress:
+      enabled: true
+      ingressClassName: traefik-internal
+      hosts:
+        - host: headlamp.dev.home
+          paths:
+            - path: /
+              type: ImplementationSpecific
