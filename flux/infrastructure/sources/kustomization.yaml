@@ -7,3 +7,4 @@ resources:
   - metrics-server.yaml
   - sealed-secrets.yaml
   - traefik.yaml
+  - cloudnativepg.yaml
