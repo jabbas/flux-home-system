@@ -17,11 +17,15 @@ spec:
   values:
     csiDriver:
       name: "org.democratic-csi.nfs"
-      fsGroupPolicy: File
+      fsGroupPolicy: ReadWriteOnceWithFSType
 
     driver:
       config:
         driver: zfs-generic-nfs
+      nfs:
+        shareStrategySetDatasetProperties:
+          properties:
+            sharenfs: "rw,no_subtree_check,no_root_squash"
       existingConfigSecret: csi-zfs-pve-ssd
 
     storageClasses:
@@ -35,4 +39,4 @@ spec:
         mountOptions:
           - noatime
           - nolock
-          # - nfsvers=3
+          - nfsvers=4.1
