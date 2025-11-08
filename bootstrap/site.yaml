@@ -16,7 +16,7 @@
 
     talos:
       schematic_id: ce4c980550dd2ab1b17bbf2b08801c7eb59418eafe8f279833297925d67c7515
-      version: 1.11.3
+      version: 1.11.5
 
       domain_name: home
       cluster_name: k8s
