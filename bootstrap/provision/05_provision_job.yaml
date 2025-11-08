@@ -39,7 +39,7 @@ spec:
             - bootstrap
             - git
             - --silent
-            - --url=ssh://git@github.com/jabbas/homek8s-flux.git
+            - --url=ssh://git@github.com/jabbas/flux-home-system.git
             - --branch=main
             - --private-key-file=/ssh/identity
             - --path=flux/cluster
