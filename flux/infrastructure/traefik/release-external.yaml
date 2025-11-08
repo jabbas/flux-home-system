@@ -36,6 +36,6 @@ spec:
       spec:
         loadBalancerIP: 10.1.200.0
     tlsStore:
-      default:
+      external:
         defaultCertificate:
           secretName: dev-home-default-certificate
