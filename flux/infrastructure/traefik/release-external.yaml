@@ -31,7 +31,11 @@ spec:
       seccompProfile:
         type: RuntimeDefault
     ingressClass:
+      name: traefik-external
       isDefaultClass: false
+    providers:
+      kubernetesIngress:
+        ingressClass: traefik-external
     service:
       spec:
         loadBalancerIP: 10.1.200.0

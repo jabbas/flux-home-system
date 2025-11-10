@@ -30,6 +30,12 @@ spec:
     podSecurityContext:
       seccompProfile:
         type: RuntimeDefault
+    ingressClass:
+      name: traefik-internal
+      isDefaultClass: true
+    providers:
+      kubernetesIngress:
+        ingressClass: traefik-internal
     service:
       spec:
         loadBalancerIP: 10.1.200.1
