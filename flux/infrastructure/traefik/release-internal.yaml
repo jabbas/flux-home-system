@@ -40,6 +40,13 @@ spec:
       spec:
         loadBalancerIP: 10.1.200.1
     tlsStore:
-      internal:
+      default:
         defaultCertificate:
           secretName: dev-home-default-certificate
+    ports:
+      web:
+        redirections:
+          entryPoint:
+            to: websecure
+            scheme: https
+            permanent: true
