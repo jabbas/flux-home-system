@@ -15,7 +15,17 @@
       password: Kbchilwl80
 
     talos:
-      schematic_id: ce4c980550dd2ab1b17bbf2b08801c7eb59418eafe8f279833297925d67c7515
+      ## schematic_id includes:
+      # customization:
+      #   systemExtensions:
+      #     officialExtensions:
+      #       - siderolabs/iscsi-tools
+      #       - siderolabs/nvme-cli
+      #       - siderolabs/qemu-guest-agent
+      #       - siderolabs/thunderbolt
+      #       - siderolabs/util-linux-tools
+      #       - siderolabs/zfs
+      schematic_id: 695c96d5c3ecbe6a8d2588c42e210d356d1c9c5d280ec2d573ecf74ae0f1a8a6
       version: 1.11.5
 
       domain_name: home

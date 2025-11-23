@@ -1,7 +1,0 @@
----
-machine:
-  install:
-    extensions:
-      - image: ghcr.io/siderolabs/qemu-guest-agent:10.0.2
-      - image: ghcr.io/siderolabs/zfs:2.3.3-v1.10.5
-      - image: ghcr.io/siderolabs/iscsi-tools:v0.2.0
