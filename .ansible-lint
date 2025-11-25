@@ -1,0 +1,4 @@
+skip_list:
+  - command-instead-of-shell
+  - line-length
+  - yaml[line-length]
