@@ -22,8 +22,7 @@
       loop: "{{ node_versions.results }}"
 
 - name: Apply patches
-  ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ item }} apply {{ '--insecure' if not already_provisioned_nodes[item] else '' }} -f controlplane.yaml -p '[{\"op\": \"add\", \"path\": \"/machine/install/image\", \"value\": \"factory.talos.dev/metal-installer/{{ talos.schematic_id }}:v1.10.5\"}]' -p @patch/allow-scheduling.yaml -p @patch/remove-externallb-label.yaml"
-  #ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ item }} apply {{ '--insecure' if not already_provisioned_nodes[item] else '' }} -f controlplane.yaml -p @patch/factory-image.yaml -p @patch/allow-scheduling.yaml -p @patch/remove-externallb-label.yaml"
+  ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ item }} apply {{ '--insecure' if not already_provisioned_nodes[item] else '' }} -f controlplane.yaml -p '[{\"op\": \"add\", \"path\": \"/machine/install/image\", \"value\": \"factory.talos.dev/metal-installer/{{ talos.schematic_id }}:v{{ talos.version }}\"}]' -p @patch/allow-scheduling.yaml -p @patch/remove-externallb-label.yaml"
   loop: "{{ groups['all'] }}"
 
 - name: Wait for Talos install to be ready
@@ -60,6 +59,7 @@
 - name: Generate kubectl config
   connection: local
   ansible.builtin.shell: "talosctl --nodes {{ groups['all'][0] }} --endpoints {{ groups['all'][0] }} kubeconfig"
+  changed_when: false
 
 - name: Provision it with flux
   connection: local
