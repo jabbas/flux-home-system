@@ -16,16 +16,26 @@
 
     talos:
       ## schematic_id includes:
+      ## customization:
+      ##   systemExtensions:
+      ##     officialExtensions:
+      ##       - siderolabs/iscsi-tools
+      ##       - siderolabs/nvme-cli
+      ##       - siderolabs/qemu-guest-agent
+      ##       - siderolabs/thunderbolt
+      ##       - siderolabs/util-linux-tools
+      ##       - siderolabs/zfs
+      # schematic_id: 695c96d5c3ecbe6a8d2588c42e210d356d1c9c5d280ec2d573ecf74ae0f1a8a6
+
       # customization:
-      #   systemExtensions:
-      #     officialExtensions:
-      #       - siderolabs/iscsi-tools
-      #       - siderolabs/nvme-cli
-      #       - siderolabs/qemu-guest-agent
-      #       - siderolabs/thunderbolt
-      #       - siderolabs/util-linux-tools
-      #       - siderolabs/zfs
-      schematic_id: 695c96d5c3ecbe6a8d2588c42e210d356d1c9c5d280ec2d573ecf74ae0f1a8a6
+      #     systemExtensions:
+      #         officialExtensions:
+      #             - siderolabs/iscsi-tools
+      #             - siderolabs/nvme-cli
+      #             - siderolabs/qemu-guest-agent
+      #             - siderolabs/thunderbolt
+      #             - siderolabs/util-linux-tools
+      schematic_id: 8137792da74f62f29f1fa6b6b246ed8258608e342206f4eca3c52acd34fda23c
       version: 1.11.5
 
       domain_name: home
@@ -37,7 +47,7 @@
       machine:
         type: q35
         os: l26
-        vga: qxl
+        vga: std
         agent: true
 
       controlpane:
