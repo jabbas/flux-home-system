@@ -39,6 +39,13 @@
     api_host: '{{ proxmox.host }}'
     node: '{{ proxmox.node }}'
 
+    bios: ovmf
+    efidisk0:
+      storage: "{{ proxmox.storage }}"
+      efitype: 4m
+      format: raw
+      pre_enrolled_keys: false
+
     vmid: "{{ item['vmid'] }}"
     name: "{{ item['name'] }}"
     cpu: "{{ talos.controlpane.cpu.type }}"
