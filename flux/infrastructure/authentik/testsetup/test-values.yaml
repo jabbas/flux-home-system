@@ -1,0 +1,62 @@
+---
+global:
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 0
+
+  envFrom:
+    - secretRef:
+        name: authentik-db-app
+    - secretRef:
+        name: authentik-admin
+    - secretRef:
+        name: authentik-talos-secret
+
+  volumes:
+    - name: blueprints
+      configMap:
+        name: authentik-blueprints
+
+  volumeMounts:
+    - name: blueprints
+      mountPath: /blueprints/custom
+      readOnly: true
+
+authentik:
+  log_level: info
+  error_reporting:
+    enabled: false
+
+  secret_key: env://AUTHENTIK_SECRET_KEY
+
+  postgresql:
+    host: env://host
+    name: env://dbname
+    user: env://username
+    password: env://password
+
+  email:
+    host: smtp-relay.gmail.com
+    port: 587
+    use_tls: true
+    use_ssl: false
+    from: authentik@jabbas.eu
+    timeout: 30
+
+blueprints:
+  configMaps:
+    - authentik-blueprints
+
+server:
+  replicas: 2
+
+  ingress:
+    enabled: true
+    ingressClassName: traefik-internal
+    hosts:
+      - authentik.dev.home
+
+worker:
+  replicas: 2

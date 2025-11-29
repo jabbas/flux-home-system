@@ -39,11 +39,12 @@
   when: already_provisioned_nodes.values() |select('equalto', false) |list |length==already_provisioned_nodes |length
   changed_when: false
 
-- name: Wait for Talos boostrap to be completed (kubeapi is ready)
+- name: Wait for Talos bootstrap to be completed (kubeapi is ready)
   ansible.builtin.wait_for:
     host: "{{ item }}"
     port: 6443
   loop: "{{ groups['all'] }}"
+  timeout: 400
 
 - name: Update talosconfig with endpoint
   connection: local
