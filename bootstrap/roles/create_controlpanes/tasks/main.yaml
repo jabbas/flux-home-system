@@ -33,7 +33,7 @@
     src: "./talos-{{ talos.version }}-{{ talos.schematic_id }}-metal-amd64.iso"
 
 - name: Create ControlPane Virtual Machine
-  community.general.proxmox_kvm:
+  community.proxmox.proxmox_kvm:
     api_user: '{{ proxmox.user }}'
     api_password: '{{ proxmox.password }}'
     api_host: '{{ proxmox.host }}'
@@ -73,7 +73,7 @@
   with_items: "{{ controlpanes }}"
 
 - name: Start ControlPane Virtual Machines
-  community.general.proxmox_kvm:
+  community.proxmox.proxmox_kvm:
     api_user: '{{ proxmox.user }}'
     api_password: '{{ proxmox.password }}'
     api_host: '{{ proxmox.host }}'
