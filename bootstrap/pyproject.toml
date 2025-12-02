@@ -1,0 +1,12 @@
+[project]
+name = "talos-bootstrap"
+version = "0.1.0"
+description = "bootstrap talos kubernetes with ansible"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "ansible>=13.0.0",
+    "kubernetes>=34.1.0",
+    "proxmoxer>=2.2.0",
+    "requests-toolbelt>=1.0.0",
+]
