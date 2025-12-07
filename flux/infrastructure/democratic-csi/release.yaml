@@ -28,6 +28,11 @@ spec:
             sharenfs: "rw,no_subtree_check,no_root_squash"
       existingConfigSecret: csi-zfs-pve-ssd
 
+    volumeSnapshotClasses:
+      - name: democratic-csi
+        deletionPolicy: Delete
+        parameters: {}
+
     storageClasses:
       - name: zfs-nfs-csi
         defaultClass: true
