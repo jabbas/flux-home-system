@@ -18,6 +18,7 @@
     url: "https://factory.talos.dev/image/{{ talos.schematic_id }}/v{{ talos.version }}/metal-amd64.iso"
     dest: "./talos-{{ talos.version }}-{{ talos.schematic_id }}-metal-amd64.iso"
     mode: '0644'
+    timeout: 100
   when: not iso_file.stat.exists
 
 - name: Put Talos Linux ISO into proxmox

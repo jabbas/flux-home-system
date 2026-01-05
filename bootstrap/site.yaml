@@ -36,7 +36,7 @@
       #             - siderolabs/thunderbolt
       #             - siderolabs/util-linux-tools
       schematic_id: 8137792da74f62f29f1fa6b6b246ed8258608e342206f4eca3c52acd34fda23c
-      version: 1.11.5
+      version: 1.12.1
 
       domain_name: home
       cluster_name: k8s
