@@ -30,7 +30,8 @@
         install:
           image: factory.talos.dev/metal-installer/{{ talos.schematic_id }}:v{{ talos.version }}' \
       -p @patch/allow-scheduling.yaml \
-      -p @patch/remove-externallb-label.yaml
+      -p @patch/remove-externallb-label.yaml \
+      -p @patch/oidc.yaml
   loop: "{{ groups['all'] }}"
   changed_when: false
 

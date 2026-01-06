@@ -1,0 +1,77 @@
+# OIDC configuration for Kubernetes API server
+# Enables authentication via Authentik for kubectl and Headlamp
+machine:
+  files:
+    - content: |
+        -----BEGIN CERTIFICATE-----
+        MIIKCzCCBfOgAwIBAgIBADANBgkqhkiG9w0BAQ0FADB5MQswCQYDVQQGEwJQTDET
+        MBEGA1UECAwKTWFsb3BvbHNrYTEPMA0GA1UEBwwGQ3JhY293MQ8wDQYDVQQKDAZK
+        YWJiYXMxHzAdBgkqhkiG9w0BCQEWEGphYmJhc0BqYWJiYXMuZXUxEjAQBgNVBAMM
+        CWphYmJhcy1jYTAeFw0yMzExMjYyMDEyMTdaFw0zMzExMjUyMDEyMTdaMHkxCzAJ
+        BgNVBAYTAlBMMRMwEQYDVQQIDApNYWxvcG9sc2thMQ8wDQYDVQQHDAZDcmFjb3cx
+        DzANBgNVBAoMBkphYmJhczEfMB0GCSqGSIb3DQEJARYQamFiYmFzQGphYmJhcy5l
+        dTESMBAGA1UEAwwJamFiYmFzLWNhMIIEIjANBgkqhkiG9w0BAQEFAAOCBA8AMIIE
+        CgKCBAEAubT4V3NlbY7B+hH29O5QlXFwJtoodOZi5qd5qmswhDd6vVoRDT31J8Vl
+        t2uq0AtKzHQNRV++W5KKG1MGnMqH4mHWqVd06DJt0c295ShjZP1i4ZWKIAsWjLLn
+        LdJDsLdlLmv0E87eY76e0vpy0ON3zvPC1W208okUrS/f9ywhYXCpxNdKB+4GqWNT
+        msGEe43aeZS6EMH0gIBtHPkBko6BbXes7u5R/ehbxt4dv034NXe/EElPhZu+hrgw
+        Et+7AmhNrcawxjxV1YtzOnaoV5i1YdxX+hrfKrtRiJf4GidQlzLIYEW7oQpdTGX8
+        9pW8jXcAF5rqF5+EM4mO7VeEG8uXuYxhAj70FtSvUTDkfeC4s5HU5SsjQosxwWqu
+        3MV6/HxMileE13Pd0/0O00G8w8vJUfOrxmiJ0lRPUv4Pdgl3tfakNVawJpQEl1z1
+        H7HLKs/d5VGLpv6Z1EknzkTyoD5XbcX6A+ovhuQAuDHk+i6fAXOa0w/+9uhLtI9M
+        PWjFeuBRw4DmObstFpbvUvxykYN1axx+rgc/kKMLyMZmVPaKr2tJqKc7OwYxBNbm
+        P/oINBaZCI2DG2RLfLqvbangiJn7qmG/cmVWWMlzEzpt9SWkaFQiigJoL1Fitjxu
+        09x8DvNoyxmvkb0p5Wt9yncKs6kgj07INu3GgiB4/S1cUJ5/RVRYI5LQXx6WhkJM
+        j2wrePYJx+EJbvkSaumUohdQLZUzE2+95Ty8jYjRzr85tfkH/j37KCeSB/owXIQp
+        B4x6RSzbX/B2WufagQBRIiwvIdctMtRVxsHNuxFM2M37QfcHPKwUNt4XChiBJAHF
+        e38cGcPaPjMNNP+Byfh74Jd+W3tgc4m+BFJZDn2QAwjdaAO66vI+d/S5nTCc9azc
+        iraLXKp0GhQxnXwACzC6Cq/kLm+RQInBA3i9QPdcFxSB6du59cfbdFk9e55IUh4M
+        3srJiEDPD+LBAiQN+vNhSs2yeshIK3FhZ4mqFBcN7Zj2BqbLzRECCLHtePk0XizD
+        xRaIJpNIo/jgzp7TzDybMyF5zlwvbsiDl4z9ugLUepHNfsPdtPg+9LbFIlouTXGJ
+        Z8H0YKLsqqaFB+G4PqeV4yudC+XuXKn9oGu7KalB6950ilDFAkkxMl9g/5Wka0q3
+        Hrzr4dUWP7jp2+asZVTuognWf6+sf+lGYoUk5kCZVV/BNbY2oXLYcAUEMVGGy+wz
+        PcxOFwc5NISrqCVYfddl+CVdHD+ojfpTlrzTtDxvhXWm2vmlVxKpqstUYks2Xy0s
+        vyAt6YcWg27IHsdOD2U9S1nbOmauNlteg0NYrK5lI8J3J6vvPQvRmWaQrmgHGVR8
+        ERTqfMwXe80UwE1U3yK6RxUbrwfixwIDAQABo4GdMIGaMDcGCWCGSAGG+EIBDQQq
+        FihPUE5zZW5zZSBHZW5lcmF0ZWQgQ2VydGlmaWNhdGUgQXV0aG9yaXR5MB0GA1Ud
+        DgQWBBQDd96PtOKjnI0x7X2kuoz7iUeotjAfBgNVHSMEGDAWgBQDd96PtOKjnI0x
+        7X2kuoz7iUeotjAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBhjANBgkq
+        hkiG9w0BAQ0FAAOCBAEAJ0qg6ClM0K2x533qO2CevlmFfm8CylWvXJEu4EYs9lXK
+        wsZ7HqK/g/hP+wcqPOLQfxIg56mxJoJ4DyMh+5XYz8KVM/Hh2jNVgaOfLyxEN4gu
+        hLfQNSJPVcQ7Mrb6opSk08+CIhhuWoWo0aYGuEMz6bYzMMtLnGwz0b9zoFn0Ftl2
+        9p4oJCMZloNSvl5qi7Qo49CyfG4rWzkGHjuV3HWK6ZTXam3L9YwgVrPGZLrgpLF7
+        zQS8u44UnRVOe0YuffFFjNzcxsiZAzryPhCbeTZrJ3yHlTnwhbJFMcn8ZrSpdjtu
+        0PvTNhemHAgi6uo40gz3ZLUBJOdLdSMcZU9hEJr+iplWRrAPFu5BPIQ5ikP12ZOw
+        guUHFfUceR+UQQOw3kljhvMKzS8WNRJGpoJsxLC6tCbdIdN6kG5JJWKmCxdkJ5QU
+        1c7QqCdUj1x2uMN+ViO24EBjRmu9HdUhi9ErFAVmH33/+6GfONM1KKMRaRNfmkI8
+        G9dBTLaNe8XqfAwllYJsebyDGfycRukJoOsFCDtqLjadpSIvWhPOWtMuYYFyLcfg
+        0pqjYClTx/kkRwvCB1dly8CDS/Ai9pnToKypZpe1jKa4so/nahVX8+h/t4rvqgZZ
+        G/nVtEPShrKZwWxIsfonjhTZzBjmAbwkdj4NGMZKO1T1jEkAYPigkr78kyRswpDq
+        wcJkf1cUoiZobmcDumjUIa09YbTjCCbFOwWmNlN0PLLfua/n0y6CX/NvLDmHPTMf
+        a/TypYcfAcLAGqLk5b+lXIkVYsYOnu6vIwPai2m3Q7oMWKphnUxQzygbSP4pZdv8
+        rBO+AEI96O7ZzNnDvCVSetGRiTS2hgZ1ckgG3jvVdgiJGfZGEv3nYg3Frv9uQd/K
+        54/GuMlnGxXHocK38c9gMOUVGqOe3YT8LbOoELgN4/zszmUGspmWvVLITEeap883
+        AeVgITDbCwDnkn29bejgb2cta73JtW/bPm9dFiq9rDkp+LHVZeTU3sq0aW7e0TwG
+        ugKE37+rz3a+4nqcqTubbAQkcE4chPOfPOqLW3CR3ratqsvd5rpJsOezZZh5HTDG
+        UiV31X0ueNxKJBaDDR/pGvP0UGD4+Q6EH7+CGXqU6i4PHTrzXgC5aAeM9/H+mLLf
+        CvFqUDuHjtPbu/H2w+liI4fNYUAORP0S4Mpl1hax8G1vzC7NHSSKceGgzLyY4pfL
+        qU9KnjIBqaD9l/l9inbY4XwDW+zbcTAPF3eEALNarlZdHfbiPQ9l8Zky0st780Xd
+        VmpAFzG6+INCOM0lXWk5dETa3mE7pjmcR/2fxAnVxqXjwyE4VxCWipnC1WT1nMZO
+        1bzTZH/XJOnlJWW2rru2tW4AKSjSo8KrkxCpySpU2A==
+        -----END CERTIFICATE-----
+      path: /var/certs/jabbas-ca.crt
+      permissions: 0644
+      op: create
+
+cluster:
+  apiServer:
+    extraArgs:
+      oidc-issuer-url: https://authentik.dev.home/application/o/talos-cluster/
+      oidc-client-id: talos-cluster-id
+      oidc-username-claim: preferred_username
+      oidc-groups-claim: groups
+      oidc-ca-file: /etc/certs/jabbas-ca.crt
+    extraVolumes:
+      - hostPath: /var/certs
+        mountPath: /etc/certs
+        readonly: true
