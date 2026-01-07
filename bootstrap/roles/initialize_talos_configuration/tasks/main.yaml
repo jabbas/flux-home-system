@@ -2,10 +2,12 @@
 - name: Generate configuration using secrets.yaml
   connection: local
   ansible.builtin.shell: "talosctl gen config {{ talos.cluster_name }} {{ talos.endpoint }} --with-secrets {{ talos.secrets_path }} --with-examples=true --with-docs=false --install-disk {{ talos.boot_disk }} --additional-sans {{ groups['all'] | join(',') }} --force"
+  changed_when: false
 
 - name: Update talosconfig with first endpoint
   connection: local
   ansible.builtin.shell: "talosctl --talosconfig talosconfig config endpoint {{ groups['all'][0] }}"
+  changed_when: false
 
 - name: Check if nodes is already provisioned
   block:
@@ -24,6 +26,7 @@
 - name: Apply patches
   ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ item }} apply {{ '--insecure' if not already_provisioned_nodes[item] else '' }} -f controlplane.yaml -p '[{\"op\": \"add\", \"path\": \"/machine/install/image\", \"value\": \"factory.talos.dev/metal-installer/{{ talos.schematic_id }}:v{{ talos.version }}\"}]' -p @patch/allow-scheduling.yaml -p @patch/remove-externallb-label.yaml"
   loop: "{{ groups['all'] }}"
+  changed_when: false
 
 - name: Wait for Talos install to be ready
   ansible.builtin.wait_for:
@@ -34,6 +37,7 @@
 - name: Bootstrap on the first node
   ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ groups['all'][0] }} bootstrap"
   when: already_provisioned_nodes.values() |select('equalto', false) |list |length==already_provisioned_nodes |length
+  changed_when: false
 
 - name: Wait for Talos boostrap to be completed (kubeapi is ready)
   ansible.builtin.wait_for:
@@ -44,17 +48,20 @@
 - name: Update talosconfig with endpoint
   connection: local
   ansible.builtin.shell: "talosctl --talosconfig talosconfig config endpoint {{ groups['all'] | join(' ') }}"
+  changed_when: false
 
 - name: Create \$HOME/.talos directory if it doesn't exist
   ansible.builtin.file:
     path: "$HOME/.talos"
     state: directory
+    mode: '0750'
 
 - name: Copy talosconfig to \$HOME/.talos/config
   connection: local
   ansible.builtin.copy:
     src: talosconfig
     dest: "$HOME/.talos/config"
+    mode: '0644'
 
 - name: Generate kubectl config
   connection: local
