@@ -29,3 +29,4 @@ spec:
   path: ./internal-apps
   dependsOn:
     - name: traefik
+    - name: authentik

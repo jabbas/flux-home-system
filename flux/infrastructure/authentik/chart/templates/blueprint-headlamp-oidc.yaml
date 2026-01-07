@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blueprint-headlamp-oidc
+  labels:
+    app.kubernetes.io/name: authentik
+    app.kubernetes.io/component: blueprints
+data:
+  headlamp-oidc.yaml: |
+    version: 1
+    metadata:
+      name: Headlamp OIDC Setup
+      labels:
+        blueprints.goauthentik.io/instantiate: "true"
+    entries:
+      - model: authentik_core.application
+        identifiers:
+          slug: headlamp
+        attrs:
+          name: Headlamp
+          icon: https://raw.githubusercontent.com/kubernetes-sigs/headlamp/refs/heads/main/docker-extension/headlamp.svg
+          provider: !Find [authentik_providers_oauth2.oauth2provider, [name, "Talos Cluster"]]

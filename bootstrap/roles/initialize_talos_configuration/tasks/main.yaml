@@ -4,6 +4,29 @@
   ansible.builtin.shell: "talosctl gen config {{ talos.cluster_name }} {{ talos.endpoint }} --with-secrets {{ talos.secrets_path }} --with-examples=true --with-docs=false --install-disk {{ talos.boot_disk }} --additional-sans {{ groups['all'] | join(',') }} --force"
   changed_when: false
 
+- name: Authentik Pre-Shared Key File check
+  connection: local
+  ansible.builtin.stat:
+    path: authentik.preshared.key
+  register: authentik_preshared_key_check
+
+- name: Generate Authentik Pre-Shared Key
+  when:
+    not authentik_preshared_key_check.stat.exists
+  block:
+    - name: Generate Authentik Pre-Shared Key
+      connection: local
+      ansible.builtin.shell: "openssl rand -hex 16"
+      register: authentik_preshared_key
+      changed_when: false
+
+    - name: Save Authentik Pre-Shared Key to disk
+      connection: local
+      ansible.builtin.copy:
+        content: "{{ authentik_preshared_key.stdout }}"
+        dest: "authentik.preshared.key"
+        mode: '0644'
+
 - name: Update talosconfig with first endpoint
   connection: local
   ansible.builtin.shell: "talosctl --talosconfig talosconfig config endpoint {{ groups['all'][0] }}"

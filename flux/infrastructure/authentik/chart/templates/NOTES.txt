@@ -1,0 +1,24 @@
+Authentik Stack has been deployed!
+
+1. Wait for the database to be ready:
+   kubectl wait --for=condition=ready cluster/authentik-db -n {{ .Release.Namespace }} --timeout=300s
+
+2. Access Authentik:
+   URL: https://{{ (index .Values.authentik.server.ingress.hosts 0) }}
+   Email: {{ .Values.admin.email }}
+   Password: (value of admin.password)
+
+3. Configure kubectl OIDC:
+   kubectl config set-credentials oidc-user \
+     --exec-api-version=client.authentication.k8s.io/v1beta1 \
+     --exec-command=kubectl \
+     --exec-arg=oidc-login \
+     --exec-arg=get-token \
+     --exec-arg=--oidc-issuer-url=https://{{ (index .Values.authentik.server.ingress.hosts 0) }}/application/o/talos-cluster/ \
+     --exec-arg=--oidc-client-id=talos-cluster-id \
+     --exec-arg=--oidc-client-secret=<YOUR_OIDC_SECRET> \
+     --exec-arg=--oidc-extra-scope=profile \
+     --exec-arg=--oidc-extra-scope=email \
+     --exec-arg=--oidc-extra-scope=groups
+
+   kubectl config set-context oidc --cluster=<your-cluster> --user=oidc-user

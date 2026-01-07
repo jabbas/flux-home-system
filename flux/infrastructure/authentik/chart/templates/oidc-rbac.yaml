@@ -1,0 +1,30 @@
+{{- if .Values.rbac.enabled }}
+# ClusterRoleBinding for OIDC users
+#
+# NOTE: Headlamp in-cluster OIDC mode has a known bug where it doesn't pass
+# Impersonate-Group headers to Kubernetes API, so group-based RBAC doesn't work.
+# As a workaround, users must be added explicitly until the issue is fixed.
+#
+# References:
+# - https://github.com/kubernetes-sigs/headlamp/issues/4198
+# - https://headlamp.dev/docs/latest/installation/in-cluster/oidc/
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oidc-kubernetes-admins
+subjects:
+  {{- range .Values.rbac.clusterAdminGroups }}
+  - kind: Group
+    name: {{ . }}
+    apiGroup: rbac.authorization.k8s.io
+  {{- end }}
+  {{- range .Values.rbac.clusterAdminUsers }}
+  - kind: User
+    name: {{ . }}
+    apiGroup: rbac.authorization.k8s.io
+  {{- end }}
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

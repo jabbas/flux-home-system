@@ -1,0 +1,35 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: authentik-db
+spec:
+  instances: {{ .Values.database.instances }}
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+  bootstrap:
+    initdb:
+      database: authentik
+      owner: authentik
+  storage:
+    size: {{ .Values.database.size }}
+  backup:
+    volumeSnapshot:
+      className: {{ .Values.database.snapshotClassName }}
+      online: true
+      onlineConfiguration:
+        waitForArchive: true
+        immediateCheckpoint: true
+  monitoring:
+    enablePodMonitor: false
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: authentik-db-weekly
+spec:
+  schedule: {{ .Values.database.backupSchedule | quote }}
+  backupOwnerReference: self
+  cluster:
+    name: authentik-db
+  method: volumeSnapshot

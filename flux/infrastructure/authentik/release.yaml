@@ -1,0 +1,21 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: authentik-stack
+  namespace: authentik
+spec:
+  chart:
+    spec:
+      chart: ./flux/infrastructure/authentik/chart
+      reconcileStrategy: Revision
+      sourceRef:
+        kind: GitRepository
+        name: flux-system
+        namespace: flux-system
+  interval: 1m0s
+  timeout: 10m0s
+  values:
+    admin:
+      email: jabbas@jabbas.eu
+      password: trompka

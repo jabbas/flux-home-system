@@ -1,0 +1,128 @@
+# Database configuration
+database:
+  instances: 2
+  size: 0.5Gi
+  backupSchedule: "0 2 * * 1"
+  snapshotClassName: democratic-csi
+
+# Admin bootstrap credentials
+admin:
+  email: jabbas@jabbas.eu
+  password: ""   # Required
+  token: ""      # Auto-generated if empty
+  secretKey: ""  # Auto-generated if empty
+
+# OIDC configuration
+oidc:
+  clientSecret: ""  # Auto-generated if empty
+  headlamp:
+    # Reflector settings for syncing to internal-apps namespace
+    reflector:
+      enabled: true
+      targetNamespace: internal-apps
+      targetSecretName: oidc-secret-headlamp
+
+# Users to create
+users:
+  - username: jabbas
+    email: jabbas@jabbas.eu
+    name: Grzegorz Dzięgielewski
+    superuser: true
+    groups:
+      - kubernetes-admins
+      - authentik Admins
+
+# Groups to create
+groups:
+  - name: kubernetes-admins
+    superuser: false
+
+# RBAC for OIDC users
+rbac:
+  enabled: true
+  clusterAdminUsers:
+    - jabbas
+  clusterAdminGroups:
+    - kubernetes-admins
+
+# Authentik subchart values
+authentik:
+  global:
+    deploymentStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 2
+        maxUnavailable: 0
+    envFrom:
+      - secretRef:
+          name: authentik-db-app
+      - secretRef:
+          name: authentik-admin
+      - secretRef:
+          name: oidc-secret-talos
+
+  authentik:
+    log_level: info
+    error_reporting:
+      enabled: false
+    secret_key: env://AUTHENTIK_SECRET_KEY
+    postgresql:
+      host: env://host
+      name: env://dbname
+      user: env://username
+      password: env://password
+    email:
+      host: smtp-relay.gmail.com
+      port: 587
+      use_tls: true
+      use_ssl: false
+      from: authentik@jabbas.eu
+      timeout: 30
+
+  blueprints:
+    configMaps:
+      - blueprint-talos-oidc
+      - blueprint-headlamp-oidc
+      - blueprint-groups
+      - blueprint-users
+
+  server:
+    replicas: 2
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      runAsNonRoot: true
+      runAsUser: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    ingress:
+      enabled: true
+      ingressClassName: traefik-internal
+      hosts:
+        - authentik.dev.home
+
+  worker:
+    replicas: 2
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      runAsNonRoot: true
+      runAsUser: 1000
+      seccompProfile:
+        type: RuntimeDefault

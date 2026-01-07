@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blueprint-groups
+  labels:
+    app.kubernetes.io/name: authentik
+    app.kubernetes.io/component: blueprints
+data:
+  groups.yaml: |
+    version: 1
+    metadata:
+      name: Groups
+      labels:
+        blueprints.goauthentik.io/instantiate: "true"
+    entries:
+      {{- range .Values.groups }}
+      - model: authentik_core.group
+        identifiers:
+          name: {{ .name }}
+        attrs:
+          is_superuser: {{ .superuser | default false }}
+      {{- end }}
