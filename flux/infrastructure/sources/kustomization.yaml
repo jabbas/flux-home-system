@@ -5,6 +5,7 @@ resources:
   - democratic-csi.yaml
   - metallb.yaml
   - metrics-server.yaml
+  - reflector.yaml
   - sealed-secrets.yaml
   - traefik.yaml
   - cloudnativepg.yaml
