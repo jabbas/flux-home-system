@@ -1,10 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: blueprint-users
+  name: {{ include "authentik-blueprints.fullname" . }}-users
   labels:
-    app.kubernetes.io/name: authentik
-    app.kubernetes.io/component: blueprints
+    {{- include "authentik-blueprints.componentLabels" (dict "context" . "component" "users") | nindent 4 }}
 data:
   users.yaml: |
     version: 1
@@ -23,7 +22,6 @@ data:
           name: {{ .name }}
           is_active: true
           is_superuser: {{ .superuser | default false }}
-          password: !Env [AUTHENTIK_BOOTSTRAP_PASSWORD, "changeme"]
           groups:
             {{- range .groups }}
             - !Find [authentik_core.group, [name, {{ . }}]]

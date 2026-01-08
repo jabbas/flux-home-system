@@ -1,0 +1,11 @@
+Authentik Blueprints installed.
+
+ConfigMaps created:
+  - {{ include "authentik-blueprints.fullname" . }}-groups
+  - {{ include "authentik-blueprints.fullname" . }}-users
+  - {{ include "authentik-blueprints.fullname" . }}-talos-oidc
+{{- if .Values.oidc.headlamp.enabled }}
+  - {{ include "authentik-blueprints.fullname" . }}-headlamp-oidc
+{{- end }}
+
+Add these ConfigMaps to your Authentik deployment's blueprints.configMaps list.

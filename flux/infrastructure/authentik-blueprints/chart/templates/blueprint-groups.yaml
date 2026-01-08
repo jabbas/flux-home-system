@@ -1,10 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: blueprint-groups
+  name: {{ include "authentik-blueprints.fullname" . }}-groups
   labels:
-    app.kubernetes.io/name: authentik
-    app.kubernetes.io/component: blueprints
+    {{- include "authentik-blueprints.componentLabels" (dict "context" . "component" "groups") | nindent 4 }}
 data:
   groups.yaml: |
     version: 1

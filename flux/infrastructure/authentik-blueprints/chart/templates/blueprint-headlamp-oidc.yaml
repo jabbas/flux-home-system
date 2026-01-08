@@ -1,10 +1,10 @@
+{{- if .Values.oidc.headlamp.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: blueprint-headlamp-oidc
+  name: {{ include "authentik-blueprints.fullname" . }}-headlamp-oidc
   labels:
-    app.kubernetes.io/name: authentik
-    app.kubernetes.io/component: blueprints
+    {{- include "authentik-blueprints.componentLabels" (dict "context" . "component" "headlamp-oidc") | nindent 4 }}
 data:
   headlamp-oidc.yaml: |
     version: 1
@@ -18,5 +18,6 @@ data:
           slug: headlamp
         attrs:
           name: Headlamp
-          icon: https://raw.githubusercontent.com/kubernetes-sigs/headlamp/refs/heads/main/docker-extension/headlamp.svg
+          icon: {{ .Values.oidc.headlamp.icon | quote }}
           provider: !Find [authentik_providers_oauth2.oauth2provider, [name, "Talos Cluster"]]
+{{- end }}

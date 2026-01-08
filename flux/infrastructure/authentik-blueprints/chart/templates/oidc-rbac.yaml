@@ -1,4 +1,3 @@
-{{- if .Values.rbac.enabled }}
 # ClusterRoleBinding for OIDC users
 #
 # NOTE: Headlamp in-cluster OIDC mode has a known bug where it doesn't pass
@@ -11,14 +10,16 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: oidc-kubernetes-admins
+  name: {{ include "authentik-blueprints.fullname" . }}-oidc-admins
+  labels:
+    {{- include "authentik-blueprints.componentLabels" (dict "context" . "component" "rbac") | nindent 4 }}
 subjects:
-  {{- range .Values.rbac.clusterAdminGroups }}
+  {{- range .Values.clusterAdminGroups }}
   - kind: Group
     name: {{ . }}
     apiGroup: rbac.authorization.k8s.io
   {{- end }}
-  {{- range .Values.rbac.clusterAdminUsers }}
+  {{- range .Values.clusterAdminUsers }}
   - kind: User
     name: {{ . }}
     apiGroup: rbac.authorization.k8s.io
@@ -27,4 +28,3 @@ roleRef:
   kind: ClusterRole
   name: cluster-admin
   apiGroup: rbac.authorization.k8s.io
-{{- end }}

@@ -1,0 +1,38 @@
+nameOverride: ""
+fullnameOverride: ""
+
+# Groups to create
+groups:
+  - name: kubernetes-admins
+    superuser: false
+
+# Users to create
+users:
+  - username: jabbas
+    email: jabbas@jabbas.eu
+    name: Grzegorz Dzięgielewski
+    superuser: true
+    groups:
+      - kubernetes-admins
+      - authentik Admins
+
+# OIDC configuration
+oidc:
+  talos:
+    clientId: talos-cluster-id
+    icon: https://raw.githubusercontent.com/devicons/devicon/master/icons/talos/talos-original.svg
+    redirectUris:
+      - url: http://localhost:8000
+      - url: http://localhost:18000
+      - url: https://headlamp.dev.home/oidc-callback
+      - url: http://headlamp.dev.home/oidc-callback
+
+  headlamp:
+    enabled: true
+    icon: https://raw.githubusercontent.com/kubernetes-sigs/headlamp/refs/heads/main/docker-extension/headlamp.svg
+
+# RBAC for OIDC users
+clusterAdminUsers:
+  - jabbas
+clusterAdminGroups:
+  - kubernetes-admins

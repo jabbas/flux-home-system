@@ -1,7 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: authentik-db
+  name: {{ include "authentik-stack.database.fullname" . }}
+  labels:
+    {{- include "authentik-stack.componentLabels" (dict "context" . "component" "database") | nindent 4 }}
 spec:
   instances: {{ .Values.database.instances }}
   affinity:
@@ -26,10 +28,12 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: authentik-db-weekly
+  name: {{ include "authentik-stack.database.fullname" . }}-weekly
+  labels:
+    {{- include "authentik-stack.componentLabels" (dict "context" . "component" "database") | nindent 4 }}
 spec:
   schedule: {{ .Values.database.backupSchedule | quote }}
   backupOwnerReference: self
   cluster:
-    name: authentik-db
+    name: {{ include "authentik-stack.database.fullname" . }}
   method: volumeSnapshot
