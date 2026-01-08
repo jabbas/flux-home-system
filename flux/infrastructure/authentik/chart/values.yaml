@@ -73,6 +73,7 @@ authentik:
   # - {blueprints-fullname}-users
   blueprints:
     configMaps:
+      - authentik-blueprints-recovery-flow
       - authentik-blueprints-talos-oidc
       - authentik-blueprints-headlamp-oidc
       - authentik-blueprints-groups

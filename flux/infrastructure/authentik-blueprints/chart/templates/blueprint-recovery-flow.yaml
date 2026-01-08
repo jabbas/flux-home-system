@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "authentik-blueprints.fullname" . }}-recovery-flow
+  labels:
+    {{- include "authentik-blueprints.componentLabels" (dict "context" . "component" "recovery-flow") | nindent 4 }}
+data:
+  recovery-flow.yaml: |
+    version: 1
+    metadata:
+      name: Recovery Flow
+      labels:
+        blueprints.goauthentik.io/instantiate: "true"
+    entries:
+      # ===================
+      # Recovery Flow Setup
+      # ===================
+
+      # Email stage for sending recovery link
+      - model: authentik_stages_email.emailstage
+        id: recovery-email-stage
+        identifiers:
+          name: recovery-email
+        attrs:
+          subject: Password Recovery
+          template: email/password_reset.html
+          timeout: 30
+          activate_user_on_success: true
+
+      # Password stage for setting new password
+      - model: authentik_stages_password.passwordstage
+        id: recovery-password-stage
+        identifiers:
+          name: recovery-password
+        attrs:
+          backends:
+            - authentik.core.auth.InbuiltBackend
+
+      # User write stage to save the new password
+      - model: authentik_stages_user_write.userwritestage
+        id: recovery-user-write-stage
+        identifiers:
+          name: recovery-user-write
+        attrs:
+          create_users_as_inactive: false
+
+      # Identification stage
+      - model: authentik_stages_identification.identificationstage
+        id: recovery-identification-stage
+        identifiers:
+          name: recovery-identification
+        attrs:
+          user_fields:
+            - email
+            - username
+
+      # Recovery flow
+      - model: authentik_flows.flow
+        id: recovery-flow
+        identifiers:
+          slug: default-recovery-flow
+        attrs:
+          name: Default Recovery Flow
+          title: Reset your password
+          designation: recovery
+
+      # Flow stage bindings
+      - model: authentik_flows.flowstagebinding
+        identifiers:
+          target: !KeyOf recovery-flow
+          stage: !KeyOf recovery-identification-stage
+          order: 10
+
+      - model: authentik_flows.flowstagebinding
+        identifiers:
+          target: !KeyOf recovery-flow
+          stage: !KeyOf recovery-email-stage
+          order: 20
+
+      - model: authentik_flows.flowstagebinding
+        identifiers:
+          target: !KeyOf recovery-flow
+          stage: !KeyOf recovery-password-stage
+          order: 30
+
+      - model: authentik_flows.flowstagebinding
+        identifiers:
+          target: !KeyOf recovery-flow
+          stage: !KeyOf recovery-user-write-stage
+          order: 40
+
+      # ===================
+      # Brand Configuration
+      # ===================
+
+      - model: authentik_brands.brand
+        identifiers:
+          domain: {{ .Values.brand.domain | quote }}
+        attrs:
+          default: true
+          branding_title: {{ .Values.brand.title | quote }}
+          flow_recovery: !KeyOf recovery-flow
+          flow_invalidation: !Find [authentik_flows.flow, [slug, default-invalidation-flow]]
+          flow_user_settings: !Find [authentik_flows.flow, [slug, default-user-settings-flow]]

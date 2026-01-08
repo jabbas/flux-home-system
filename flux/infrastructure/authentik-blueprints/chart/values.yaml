@@ -1,6 +1,11 @@
 nameOverride: ""
 fullnameOverride: ""
 
+# Brand configuration
+brand:
+  domain: authentik-default
+  title: Authentik
+
 # Groups to create
 groups:
   - name: kubernetes-admins
