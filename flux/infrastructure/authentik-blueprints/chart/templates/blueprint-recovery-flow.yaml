@@ -22,6 +22,7 @@ data:
         identifiers:
           name: recovery-email
         attrs:
+          use_global_settings: true
           subject: Password Recovery
           template: email/password_reset.html
           timeout: 30
