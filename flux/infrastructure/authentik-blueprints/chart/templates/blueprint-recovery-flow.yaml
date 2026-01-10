@@ -28,14 +28,41 @@ data:
           timeout: 30
           activate_user_on_success: true
 
-      # Password stage for setting new password
-      - model: authentik_stages_password.passwordstage
+      # Prompt for new password
+      - model: authentik_stages_prompt.prompt
+        id: recovery-password-prompt
+        identifiers:
+          field_key: password
+        attrs:
+          field_key: password
+          label: New Password
+          type: password
+          required: true
+          placeholder: Enter new password
+          order: 0
+
+      - model: authentik_stages_prompt.prompt
+        id: recovery-password-repeat-prompt
+        identifiers:
+          field_key: password_repeat
+        attrs:
+          field_key: password_repeat
+          label: Repeat Password
+          type: password
+          required: true
+          placeholder: Repeat new password
+          order: 1
+
+      # Prompt stage for setting new password
+      - model: authentik_stages_prompt.promptstage
         id: recovery-password-stage
         identifiers:
           name: recovery-password
         attrs:
-          backends:
-            - authentik.core.auth.InbuiltBackend
+          fields:
+            - !KeyOf recovery-password-prompt
+            - !KeyOf recovery-password-repeat-prompt
+          validation_policies: []
 
       # User write stage to save the new password
       - model: authentik_stages_user_write.userwritestage
