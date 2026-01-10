@@ -17,5 +17,5 @@ spec:
   timeout: 10m0s
   values:
     admin:
-      email: jabbas@jabbas.eu
+      email: jabbas+authentik@jabbas.eu
       password: trompka
