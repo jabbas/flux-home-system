@@ -16,6 +16,10 @@ admin:
   token: ""      # Auto-generated if empty
   secretKey: ""  # Auto-generated if empty
 
+# Send recovery emails to all users on install
+sendRecoveryEmails:
+  enabled: true
+
 # OIDC configuration
 oidc:
   clientSecret: ""  # Auto-generated if empty

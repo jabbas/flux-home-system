@@ -3,7 +3,7 @@ fullnameOverride: ""
 
 # Brand configuration
 brand:
-  domain: authentik-default
+  domain: authentik.dev.home
   title: Authentik
 
 # Groups to create
@@ -41,3 +41,4 @@ clusterAdminUsers:
   - jabbas
 clusterAdminGroups:
   - kubernetes-admins
+

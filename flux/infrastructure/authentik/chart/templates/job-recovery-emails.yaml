@@ -1,0 +1,124 @@
+{{- if .Values.sendRecoveryEmails.enabled }}
+{{- $fullname := include "authentik-stack.fullname" . -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $fullname }}-recovery-emails
+  labels:
+    {{- include "authentik-stack.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: hook-succeeded,before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: send-recovery-emails
+          image: python:3.12-alpine
+          env:
+            - name: AUTHENTIK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $fullname }}-admin
+                  key: AUTHENTIK_BOOTSTRAP_TOKEN
+            - name: AUTHENTIK_URL
+              value: "http://{{ $fullname }}-server"
+            - name: AUTHENTIK_EXTERNAL_HOST
+              value: {{ index .Values.authentik.server.ingress.hosts 0 | quote }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              pip install --quiet requests &&
+              python -u << 'EOF'
+              import os
+              import time
+              import requests
+
+              INTERNAL_URL = os.environ["AUTHENTIK_URL"]
+              EXTERNAL_HOST = os.environ["AUTHENTIK_EXTERNAL_HOST"]
+              TOKEN = os.environ["AUTHENTIK_TOKEN"]
+              EMAIL_STAGE_NAME = "recovery-email"
+
+
+              def api_get(session: requests.Session, path: str, params: dict = None) -> dict:
+                  resp = session.get(f"{INTERNAL_URL}/api/v3{path}", params=params)
+                  resp.raise_for_status()
+                  return resp.json()
+
+
+              def api_post(session: requests.Session, path: str, params: dict = None) -> requests.Response:
+                  resp = session.post(f"{INTERNAL_URL}/api/v3{path}", params=params)
+                  resp.raise_for_status()
+                  return resp
+
+
+              def wait_for_email_stage(session: requests.Session, name: str, retries: int = 30) -> str | None:
+                  print(f"Waiting for email stage '{name}'...")
+                  for i in range(retries):
+                      try:
+                          result = api_get(session, "/stages/email/", {"name": name})
+                          if result.get("results"):
+                              stage_id = str(result["results"][0]["pk"])
+                              print(f"Found email stage: {stage_id}")
+                              return stage_id
+                      except Exception as e:
+                          print(f"  Attempt {i+1}/{retries}: {e}")
+                      time.sleep(5)
+                  return None
+
+
+              def get_all_users(session: requests.Session) -> list:
+                  users = []
+                  page = 1
+                  while True:
+                      result = api_get(session, "/core/users/", {"page": page, "page_size": 100})
+                      for user in result.get("results", []):
+                          # Skip service accounts and internal users
+                          if user.get("type") in ("service_account", "internal_service_account"):
+                              continue
+                          if not user.get("email"):
+                              continue
+                          users.append(user)
+                      if not result.get("pagination", {}).get("next"):
+                          break
+                      page += 1
+                  return users
+
+
+              def main():
+                  session = requests.Session()
+                  session.headers.update({
+                      "Authorization": f"Bearer {TOKEN}",
+                      "Host": EXTERNAL_HOST,
+                  })
+
+                  email_stage_id = wait_for_email_stage(session, EMAIL_STAGE_NAME)
+                  if not email_stage_id:
+                      print(f"Timeout waiting for email stage '{EMAIL_STAGE_NAME}'")
+                      exit(1)
+
+                  users = get_all_users(session)
+                  print(f"Found {len(users)} users")
+
+                  for user in users:
+                      username = user["username"]
+                      email = user["email"]
+                      user_id = user["pk"]
+                      print(f"Processing user: {username}")
+
+                      try:
+                          api_post(session, f"/core/users/{user_id}/recovery_email/", {"email_stage": email_stage_id})
+                          print(f"  Recovery email sent to {email}")
+                      except requests.HTTPError as e:
+                          print(f"  Error: {e}")
+
+                  print("Done")
+
+
+              if __name__ == "__main__":
+                  main()
+              EOF
+{{- end }}
