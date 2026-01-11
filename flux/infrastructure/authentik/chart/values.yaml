@@ -20,11 +20,10 @@ admin:
 oidc:
   clientSecret: ""  # Auto-generated if empty
   headlamp:
-    # Reflector settings for syncing to internal-apps namespace
+    # Reflector settings - allows pull-based reflection from internal-apps namespace
     reflector:
       enabled: true
       targetNamespace: internal-apps
-      targetSecretName: oidc-secret-headlamp
 
 # Authentik subchart values
 authentik:
