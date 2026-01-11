@@ -6,7 +6,7 @@ Authentik Stack has been deployed!
 2. Access Authentik:
    URL: https://{{ (index .Values.authentik.server.ingress.hosts 0) }}
    Email: {{ .Values.admin.email }}
-   Password: (value of admin.password)
+   Password: kubectl get secret {{ include "authentik-stack.fullname" . }}-admin -n {{ .Release.Namespace }} -o jsonpath='{.data.AUTHENTIK_BOOTSTRAP_PASSWORD}' | base64 -d
 
 3. Configure kubectl OIDC:
    kubectl config set-credentials oidc-user \

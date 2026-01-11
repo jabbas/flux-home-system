@@ -15,7 +15,3 @@ spec:
         namespace: flux-system
   interval: 1m0s
   timeout: 10m0s
-  values:
-    admin:
-      email: jabbas+authentik@jabbas.eu
-      password: trompka

@@ -12,7 +12,7 @@ database:
 # Admin bootstrap credentials
 admin:
   email: jabbas+authentik@jabbas.eu
-  password: ""   # Required
+  password: ""   # Auto-generated if empty
   token: ""      # Auto-generated if empty
   secretKey: ""  # Auto-generated if empty
 
