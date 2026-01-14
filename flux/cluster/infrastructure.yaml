@@ -182,6 +182,11 @@ spec:
     - name: sources
     - name: snapshot-controller
     - name: democratic-csi
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: cloudnativepg-operator-cloudnative-pg
+      namespace: cloudnativepg-system
 
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
