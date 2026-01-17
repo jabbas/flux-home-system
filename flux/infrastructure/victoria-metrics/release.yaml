@@ -19,6 +19,9 @@ spec:
     remediation:
       retries: 3
   values:
+    # Shorten generated names to stay under 63 char limit
+    fullnameOverride: vm
+
     # VM Operator
     victoria-metrics-operator:
       enabled: true

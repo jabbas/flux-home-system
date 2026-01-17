@@ -16,6 +16,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: vmselect-vmcluster
+                name: vmselect-vm-vmcluster
                 port:
                   number: 8481
