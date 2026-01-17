@@ -270,5 +270,5 @@ spec:
   healthChecks:
     - apiVersion: apps/v1
       kind: Deployment
-      name: vm-victoria-metrics-operator
+      name: vm-stack-victoria-metrics-operator
       namespace: victoria-metrics
