@@ -55,6 +55,8 @@ authentik:
     error_reporting:
       enabled: false
     secret_key: env://AUTHENTIK_SECRET_KEY
+    # Required for embedded outpost to redirect correctly
+    authentik_host: https://authentik.dev.home
     postgresql:
       host: env://host
       name: env://dbname
