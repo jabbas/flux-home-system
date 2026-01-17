@@ -81,6 +81,7 @@ authentik:
       - authentik-blueprints-headlamp-oidc
       - authentik-blueprints-groups
       - authentik-blueprints-users
+      - authentik-blueprints-victoria-metrics
 
   server:
     replicas: 2
