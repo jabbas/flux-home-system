@@ -1,0 +1,26 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-config
+  namespace: victoria-metrics
+type: Opaque
+stringData:
+  alertmanager.yaml: |
+    global:
+      smtp_smarthost: smtp-relay.gmail.com:587
+      smtp_from: alertmanager@jabbas.eu
+      smtp_require_tls: true
+
+    route:
+      receiver: email
+      group_by: ['namespace', 'alertname']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+
+    receivers:
+      - name: email
+        email_configs:
+          - to: jabbas@jabbas.eu
+            send_resolved: true
