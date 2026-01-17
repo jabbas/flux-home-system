@@ -6,4 +6,5 @@ resources:
   - alertmanager-config.yaml
   - release.yaml
   - middleware.yaml
+  - vmselect-service.yaml
   - ingress.yaml
