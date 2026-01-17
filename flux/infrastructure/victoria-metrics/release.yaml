@@ -135,8 +135,9 @@ spec:
       enabled: true
 
     # node-exporter (Prometheus-style)
+    # Disabled due to Talos PodSecurity restrictions (requires hostNetwork, hostPID, hostPath)
     prometheus-node-exporter:
-      enabled: true
+      enabled: false
 
     # Default alerting rules
     defaultRules:
