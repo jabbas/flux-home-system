@@ -1,0 +1,21 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vmui
+  namespace: victoria-metrics
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: victoria-metrics-authentik-auth@kubernetescrd
+spec:
+  ingressClassName: traefik-internal
+  rules:
+    - host: vmui.dev.home
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vmselect-vmcluster
+                port:
+                  number: 8481
