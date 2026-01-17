@@ -8,3 +8,4 @@ bootstrap/provision/*secret*
 *secret.yaml
 *.iso
 authentik.preshared.key
+.worktrees/
