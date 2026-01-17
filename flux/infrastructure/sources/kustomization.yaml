@@ -8,5 +8,6 @@ resources:
   - reflector.yaml
   - sealed-secrets.yaml
   - traefik.yaml
+  - victoria-metrics.yaml
   - cloudnativepg.yaml
   - authentik.yaml
