@@ -10,6 +10,8 @@ brand:
 groups:
   - name: kubernetes-admins
     superuser: false
+  - name: monitoring-admins
+    superuser: false
 
 # Users to create
 users:
@@ -20,6 +22,7 @@ users:
     groups:
       - kubernetes-admins
       - authentik Admins
+      - monitoring-admins
 
 # OIDC configuration
 oidc:
@@ -35,6 +38,10 @@ oidc:
   headlamp:
     enabled: true
     icon: https://raw.githubusercontent.com/kubernetes-sigs/headlamp/refs/heads/main/docker-extension/headlamp.svg
+
+  victoriaMetrics:
+    clientId: victoria-metrics-id
+    icon: https://victoriametrics.com/images/logo.svg
 
 # RBAC for OIDC users
 clusterAdminUsers:
