@@ -1,0 +1,160 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: victoria-metrics-stack
+  namespace: victoria-metrics
+spec:
+  chart:
+    spec:
+      chart: victoria-metrics-k8s-stack
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: victoria-metrics
+        namespace: flux-system
+  interval: 1m0s
+  timeout: 10m0s
+  install:
+    remediation:
+      retries: 3
+  values:
+    # VM Operator
+    victoria-metrics-operator:
+      enabled: true
+      operator:
+        disable_prometheus_converter: false
+
+    # VMCluster - HA storage
+    vmcluster:
+      enabled: true
+      spec:
+        retentionPeriod: "30d"
+        replicationFactor: 2
+
+        vmstorage:
+          replicaCount: 2
+          storage:
+            volumeClaimTemplate:
+              spec:
+                storageClassName: zfs-nfs-csi
+                resources:
+                  requests:
+                    storage: 20Gi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+
+        vmselect:
+          replicaCount: 2
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+
+        vminsert:
+          replicaCount: 2
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+
+    # Disable vmsingle (using vmcluster instead)
+    vmsingle:
+      enabled: false
+
+    # vmagent - HA scraping
+    vmagent:
+      enabled: true
+      spec:
+        replicaCount: 2
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+
+    # vmalert - HA alerting
+    vmalert:
+      enabled: true
+      spec:
+        replicaCount: 2
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
+
+    # Alertmanager - HA
+    alertmanager:
+      enabled: true
+      spec:
+        replicaCount: 2
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+        configSecret: alertmanager-config
+
+    # Grafana disabled (using vmui)
+    grafana:
+      enabled: false
+
+    # Default scrape configs
+    kubelet:
+      enabled: true
+    kubeApiServer:
+      enabled: true
+    kubeControllerManager:
+      enabled: true
+    kubeScheduler:
+      enabled: true
+    kubeEtcd:
+      enabled: true
+    coreDns:
+      enabled: true
+    kubeProxy:
+      enabled: true
+
+    # kube-state-metrics
+    kube-state-metrics:
+      enabled: true
+
+    # node-exporter (Prometheus-style)
+    prometheus-node-exporter:
+      enabled: true
+
+    # Default alerting rules
+    defaultRules:
+      create: true
+      rules:
+        etcd: true
+        general: true
+        k8s: true
+        kubeApiserverAvailability: true
+        kubeApiserverBurnrate: true
+        kubeApiserverHistogram: true
+        kubeApiserverSlos: true
+        kubeControllerManager: true
+        kubelet: true
+        kubeProxy: true
+        kubeSchedulerAlerting: true
+        kubeSchedulerRecording: true
+        kubeStateMetrics: true
+        network: true
+        node: true
+        nodeExporterAlerting: true
+        nodeExporterRecording: true
+        vmagent: true
+        vmhealth: true
