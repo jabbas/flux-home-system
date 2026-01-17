@@ -8,29 +8,23 @@ data:
   victoria-metrics.yaml: |
     version: 1
     metadata:
-      name: Victoria Metrics OIDC Setup
+      name: Victoria Metrics Proxy Setup
       labels:
         blueprints.goauthentik.io/instantiate: "true"
     entries:
-      - model: authentik_providers_oauth2.oauth2provider
+      # Proxy provider for forwardAuth with Traefik
+      - model: authentik_providers_proxy.proxyprovider
         id: victoria-metrics-provider
         identifiers:
-          name: Victoria Metrics
+          name: Victoria Metrics Proxy
         attrs:
-          client_id: {{ .Values.oidc.victoriaMetrics.clientId | quote }}
-          client_secret: !Env [AUTHENTIK_VICTORIA_METRICS_SECRET, "fallback-secret"]
-          client_type: confidential
           authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
           invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
-          redirect_uris:
-            - url: https://vmui.dev.home/*
-              matching_mode: regex
-          property_mappings:
-            - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
-            - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
-            - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
-          signing_key: !Find [authentik_crypto.certificatekeypair, [name, "authentik Self-signed Certificate"]]
+          external_host: https://vmui.dev.home
+          mode: forward_single
+          access_token_validity: hours=24
 
+      # Application
       - model: authentik_core.application
         id: victoria-metrics-app
         identifiers:
@@ -38,8 +32,9 @@ data:
         attrs:
           name: Victoria Metrics
           icon: {{ .Values.oidc.victoriaMetrics.icon | quote }}
-          provider: !Find [authentik_providers_oauth2.oauth2provider, [name, "Victoria Metrics"]]
+          provider: !Find [authentik_providers_proxy.proxyprovider, [name, "Victoria Metrics Proxy"]]
 
+      # Policy binding for access control
       - model: authentik_policies.policybinding
         identifiers:
           order: 0
@@ -49,3 +44,11 @@ data:
           enabled: true
           negate: false
           timeout: 30
+
+      # Bind provider to the embedded outpost
+      - model: authentik_outposts.outpostproviderconfig
+        identifiers:
+          outpost: !Find [authentik_outposts.outpost, [name, "authentik Embedded Outpost"]]
+          provider: !Find [authentik_providers_proxy.proxyprovider, [name, "Victoria Metrics Proxy"]]
+        attrs:
+          order: 0
