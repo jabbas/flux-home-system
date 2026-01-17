@@ -5,7 +5,7 @@ metadata:
   name: vmui
   namespace: victoria-metrics
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: victoria-metrics-authentik-auth@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: victoria-metrics-authentik-auth@kubernetescrd,victoria-metrics-vmui-prefix@kubernetescrd
 spec:
   ingressClassName: traefik-internal
   rules:

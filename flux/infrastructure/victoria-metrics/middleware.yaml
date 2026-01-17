@@ -12,3 +12,13 @@ spec:
       - X-authentik-username
       - X-authentik-groups
       - X-authentik-email
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: vmui-prefix
+  namespace: victoria-metrics
+spec:
+  addPrefix:
+    prefix: /select/0
