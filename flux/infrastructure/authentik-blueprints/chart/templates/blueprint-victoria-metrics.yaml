@@ -44,3 +44,12 @@ data:
           enabled: true
           negate: false
           timeout: 30
+
+      # Update embedded outpost to include this provider
+      - model: authentik_outposts.outpost
+        identifiers:
+          name: "authentik Embedded Outpost"
+        state: present
+        attrs:
+          providers:
+            - !Find [authentik_providers_proxy.proxyprovider, [name, "Victoria Metrics Proxy"]]
