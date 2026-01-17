@@ -45,11 +45,13 @@ data:
           negate: false
           timeout: 30
 
-      # Update embedded outpost to include this provider
+      # Update embedded outpost to include this provider and set authentik_host
       - model: authentik_outposts.outpost
         identifiers:
           name: "authentik Embedded Outpost"
         state: present
         attrs:
+          config:
+            authentik_host: https://authentik.dev.home
           providers:
             - !Find [authentik_providers_proxy.proxyprovider, [name, "Victoria Metrics Proxy"]]
