@@ -1,0 +1,20 @@
+---
+# ClusterIP service for vmselect to enable ingress routing
+# The operator creates a headless service, but Traefik requires ClusterIP
+apiVersion: v1
+kind: Service
+metadata:
+  name: vmselect-ingress
+  namespace: victoria-metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8481
+      protocol: TCP
+      targetPort: 8481
+  selector:
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/instance: vm
+    app.kubernetes.io/name: vmselect
+    managed-by: vm-operator

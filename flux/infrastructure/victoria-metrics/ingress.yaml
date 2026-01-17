@@ -16,6 +16,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: vmselect-vm
+                name: vmselect-ingress
                 port:
                   number: 8481
