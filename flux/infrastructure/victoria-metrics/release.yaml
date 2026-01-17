@@ -2,7 +2,7 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: victoria-metrics-stack
+  name: vm-stack
   namespace: victoria-metrics
 spec:
   chart:
