@@ -44,11 +44,3 @@ data:
           enabled: true
           negate: false
           timeout: 30
-
-      # Bind provider to the embedded outpost
-      - model: authentik_outposts.outpostproviderconfig
-        identifiers:
-          outpost: !Find [authentik_outposts.outpost, [name, "authentik Embedded Outpost"]]
-          provider: !Find [authentik_providers_proxy.proxyprovider, [name, "Victoria Metrics Proxy"]]
-        attrs:
-          order: 0
