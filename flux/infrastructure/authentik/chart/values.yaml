@@ -28,6 +28,11 @@ oidc:
     reflector:
       enabled: true
       targetNamespace: internal-apps
+  grafana:
+    clientSecret: ""  # Auto-generated if empty
+    reflector:
+      enabled: true
+      targetNamespace: grafana
 
 # Authentik subchart values
 authentik:
@@ -55,6 +60,8 @@ authentik:
           name: authentik-stack-admin
       - secretRef:
           name: authentik-stack-oidc-talos
+      - secretRef:
+          name: authentik-stack-oidc-grafana
 
   authentik:
     log_level: info
@@ -88,6 +95,7 @@ authentik:
       - authentik-blueprints-groups
       - authentik-blueprints-users
       - authentik-blueprints-victoria-metrics
+      - authentik-blueprints-grafana
 
   server:
     replicas: 2

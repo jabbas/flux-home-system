@@ -43,6 +43,10 @@ oidc:
     clientId: victoria-metrics-id
     icon: https://victoriametrics.com/images/logo.svg
 
+  grafana:
+    clientId: grafana-id
+    icon: https://grafana.com/static/assets/img/fav32.png
+
 # RBAC for OIDC users
 clusterAdminUsers:
   - jabbas

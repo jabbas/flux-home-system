@@ -11,3 +11,4 @@ resources:
   - victoria-metrics.yaml
   - cloudnativepg.yaml
   - authentik.yaml
+  - grafana.yaml

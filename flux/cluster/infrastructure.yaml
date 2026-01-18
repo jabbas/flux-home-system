@@ -272,3 +272,26 @@ spec:
       kind: Deployment
       name: vm-stack-victoria-metrics-operator
       namespace: victoria-metrics
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: grafana
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  timeout: 5m0s
+  wait: true
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/grafana
+  dependsOn:
+    - name: sources
+    - name: traefik
+    - name: authentik
+    - name: authentik-blueprints
+    - name: reflector
+    - name: victoria-metrics
