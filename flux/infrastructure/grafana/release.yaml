@@ -27,6 +27,14 @@ spec:
     envFromSecrets:
       - name: authentik-stack-grafana-oauth
 
+    # Mount CA certificate for OAuth TLS verification
+    extraSecretMounts:
+      - name: jabbas-ca
+        secretName: jabbas-ca
+        mountPath: /etc/ssl/certs/jabbas-ca.crt
+        subPath: ca.crt
+        readOnly: true
+
     # Victoria Metrics datasource
     datasources:
       datasources.yaml:
@@ -80,6 +88,7 @@ spec:
         api_url: https://authentik.dev.home/application/o/userinfo/
         scopes: openid profile email groups
         role_attribute_path: "contains(groups[*], 'monitoring-admins') && 'Admin' || 'Viewer'"
+        tls_client_ca: /etc/ssl/certs/jabbas-ca.crt
       auth:
         disable_login_form: false
 
