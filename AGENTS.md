@@ -162,7 +162,50 @@ Follow order in `flux/cluster/infrastructure.yaml`:
 3. Storage: `democratic-csi` (needs sealed-secrets + snapshot-controller)
 4. Networking: `traefik` (needs metallb-config)
 5. Database: `cloudnativepg` (needs storage)
-6. Apps: `authentik` (needs cloudnativepg + traefik)
+6. Shared Secrets: `shared-secrets` (needs reflector)
+7. Apps: `authentik` (needs cloudnativepg + traefik), `grafana` (needs traefik + victoria-metrics + shared-secrets)
+
+### Shared Secrets Pattern
+
+For secrets needed by multiple applications (CA certs, shared credentials), use dedicated Kustomization:
+
+```yaml
+# flux/infrastructure/shared-secrets/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - jabbas-ca.yaml  # Secret with reflector annotations
+```
+
+**Benefits:**
+- Faster deployment (no waiting for heavy apps like authentik)
+- No external repo dependencies
+- Secrets are part of main infrastructure repo
+- Use k8s-reflector to auto-copy to other namespaces
+
+### HelmRelease Reliability
+
+For complex applications with external dependencies, add reliability configs:
+
+```yaml
+spec:
+  interval: 30m
+  timeout: 15m              # Increase for dashboard downloads
+  install:
+    remediation:
+      retries: 3            # Auto-retry on transient failures
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    recreatePods: true      # Avoid Multi-Attach with PVC
+```
+
+**Common issues this prevents:**
+- Timeout waiting for dashboard downloads from grafana.com
+- PVC Multi-Attach errors during reinstallation
+- Race conditions with secret availability
 
 ### GitRepository References
 Always use GitRepository source for local charts:
