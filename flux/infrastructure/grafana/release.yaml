@@ -6,7 +6,22 @@ metadata:
   namespace: grafana
 spec:
   interval: 30m
-  timeout: 10m
+  timeout: 15m
+
+  install:
+    remediation:
+      retries: 3
+
+  upgrade:
+    remediation:
+      retries: 3
+
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: grafana
+      namespace: grafana
+
   chart:
     spec:
       chart: grafana
@@ -17,6 +32,7 @@ spec:
         namespace: flux-system
   values:
     replicas: 1
+    recreatePods: true
 
     persistence:
       enabled: true

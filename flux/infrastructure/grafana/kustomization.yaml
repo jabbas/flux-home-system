@@ -4,3 +4,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - release.yaml
+dependsOn:
+  - name: traefik
+  - name: victoria-metrics
+  - name: internal-apps
