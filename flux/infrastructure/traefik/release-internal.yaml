@@ -23,11 +23,12 @@ spec:
           trustedIPs:
             - 10.1.255.2
             - 185.170.224.141
-        redirections:
-          entryPoint:
-            to: websecure
-            scheme: https
-            permanent: true
+        http:
+          redirections:
+            entryPoint:
+              to: websecure
+              scheme: https
+              permanent: true
     logs:
       general:
         level: ERROR
