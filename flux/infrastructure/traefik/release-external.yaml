@@ -17,8 +17,12 @@ spec:
   values:
     deployment:
       kind: DaemonSet
-    globalArguments:
-      - '--entrypoints.web.forwardedHeaders.trustedIPs=10.1.255.2,185.170.224.141'
+    ports:
+      web:
+        forwardedHeaders:
+          trustedIPs:
+            - 10.1.255.2
+            - 185.170.224.141
     logs:
       general:
         level: ERROR
