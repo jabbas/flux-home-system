@@ -3,8 +3,6 @@ bootstrap/secrets.yaml
 bootstrap/controlplane.yaml
 bootstrap/worker.yaml
 bootstrap/talosconfig
-bootstrap/patch/provision.yaml
-bootstrap/provision/*secret*
 *secret.yaml
 *.iso
 authentik.preshared.key

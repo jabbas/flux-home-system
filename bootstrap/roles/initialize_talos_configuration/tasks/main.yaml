@@ -55,7 +55,7 @@
       -p @patch/allow-scheduling.yaml \
       -p @patch/remove-externallb-label.yaml \
       -p @patch/oidc.yaml \
-      -p @patch/ghcr-registry.yaml
+      -p @patch/ghcr-registry-secret.yaml
   loop: "{{ groups['all'] }}"
   changed_when: false
 
