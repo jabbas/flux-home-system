@@ -1,91 +1,51 @@
 # AGENTS.md
 
-This file provides guidelines for agentic coding assistants working in this repository.
+Guidelines for agentic coding assistants working in this Kubernetes home lab infrastructure repository.
 
 ## Project Overview
 
-This is a **Kubernetes home lab infrastructure repository** using:
 - **Talos Linux** - Immutable, secure Kubernetes OS
 - **Flux CD** - GitOps continuous delivery
 - **Ansible** - Initial cluster bootstrapping on Proxmox VE
-- **Helm** - Package management for Kubernetes applications
+- **Helm** - Package management
 
-Primary technologies: YAML (Kubernetes manifests, Ansible playbooks, Flux configurations), Python (Ansible dependencies), Bash (utility scripts)
+Primary technologies: YAML (K8s manifests, Ansible, Flux), Python (Ansible), Bash
 
 ## Build/Lint/Test Commands
 
 ### Linting
-
 ```bash
-# YAML linting (run from repository root)
-yamllint .
-
-# Ansible linting (run from bootstrap directory)
-cd bootstrap && ansible-lint
-
-# Kubernetes manifest validation
-kubectl apply --dry-run=client -f <manifest.yaml>
-
-# Flux validation
-flux diff kustomization <name> --path ./flux/<path>
+yamllint .                           # YAML linting (max 200 chars)
+cd bootstrap && ansible-lint         # Ansible linting
+kubectl apply --dry-run=client -f <file>   # Validate K8s manifest
 ```
 
 ### Bootstrap/Deployment
-
 ```bash
-# Bootstrap entire cluster (run from bootstrap/)
 cd bootstrap
-
-# Decrypt age-encrypted secrets first
-for f in $(find . -name \*.age); do age -d -i ~/.ssh/jabbas ${f} >${f%.*}; done
-
-# Setup Python virtual environment
-uv sync
-source .venv/bin/activate
-
-# Run Ansible playbook
-ansible-playbook site.yaml
+for f in $(find . -name \*.age); do age -d -i ~/.ssh/jabbas ${f} >${f%.*}; done  # Decrypt secrets
+uv sync && source .venv/bin/activate  # Setup Python env
+ansible-playbook site.yaml            # Run full playbook
+ansible-playbook site.yaml --tags "create_vms"  # Run specific tags
 ```
 
 ### Flux Operations
-
 ```bash
-# Force reconcile from repository root
-flux -n flux-system reconcile kustomization flux-system --with-source
-
-# Reconcile specific component
-flux -n flux-system reconcile kustomization <component-name>
-
-# Check status
-flux get kustomizations -A
-flux get helmreleases -A
-
-# Suspend/resume
-flux -n flux-system suspend kustomization <name>
-flux -n flux-system resume kustomization <name>
-```
-
-### Testing Individual Components
-
-```bash
-# Test single Kustomization
-flux build kustomization <name> --path ./flux/<path>
-
-# Test HelmRelease rendering
-flux diff helmrelease <name> -n <namespace>
-
-# Apply single manifest for testing
-kubectl apply -f flux/infrastructure/<component>/<file.yaml>
+flux -n flux-system reconcile kustomization flux-system --with-source  # Force reconcile
+flux -n flux-system reconcile kustomization <name>                    # Reconcile component
+flux get kustomizations -A              # Check Kustomization status
+flux get helmreleases -A                # Check HelmRelease status
+flux build kustomization <name> --path ./flux/<path>   # Test Kustomization
+kubectl apply -f flux/infrastructure/<component>/<file>  # Apply single manifest
 ```
 
 ## Code Style Guidelines
 
 ### YAML Formatting
-
-**Line Length**: Maximum 200 characters (configured in `.yamllint`)
-**Indentation**: 2 spaces (no tabs)
-**Document separator**: Use `---` at the start of files
-**List style**: Prefer block style for readability
+- **Line length**: Max 200 chars (`.yamllint`)
+- **Indentation**: 2 spaces, no tabs
+- **Document separator**: Use `---` at file start
+- **List style**: Prefer block style
 
 ```yaml
 # Good
@@ -98,13 +58,11 @@ items: [{name: example, value: test}]
 ```
 
 ### Ansible Conventions
-
-**Task naming**: Use descriptive, imperative names starting with a capital letter
-**Quotes**: Use single quotes for module parameters, double for Jinja2 templates
-**With loops**: Use `with_items` for lists, `loop` for modern syntax
+- **Task naming**: Descriptive, imperative, capitalized
+- **Quotes**: Single quotes for modules, double for Jinja2
+- **Loops**: `with_items` for lists
 
 ```yaml
-# Good
 - name: Create ControlPane Virtual Machine
   community.proxmox.proxmox_kvm:
     api_user: '{{ proxmox.user }}'
@@ -112,17 +70,13 @@ items: [{name: example, value: test}]
   with_items: "{{ controlpanes }}"
 ```
 
-**Ignored lint rules** (`.ansible-lint`):
-- `command-instead-of-shell` - Shell features often needed
-- `line-length` - Max 200 chars allowed
-- `yaml[line-length]` - Consistent with yamllint
+**Ignored lint rules** (`.ansible-lint`): `command-instead-of-shell`, `line-length`, `yaml[line-length]`
 
 ### Kubernetes/Flux Manifests
-
-**API versions**: Use latest stable versions
-**Metadata**: Always include `name`, `namespace`, and `labels` where applicable
-**Flux dependencies**: Use `dependsOn` to enforce deployment order
-**Timeouts**: Infrastructure components: `2m0s`, complex apps: `10m0s`
+- **API versions**: Latest stable
+- **Metadata**: Always include `name`, `namespace`, `labels`
+- **Flux dependencies**: Use `dependsOn` for deployment order
+- **Timeouts**: Infrastructure: `2m0s`, complex apps: `10m0s`
 
 ```yaml
 apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -142,19 +96,17 @@ spec:
   dependsOn:
     - name: sources
     - name: sealed-secrets
-    - name: metallb-config
 ```
 
 ### Helm Chart Wrapper Pattern
-
-For applications requiring custom resources beyond upstream charts:
+For apps needing custom resources beyond upstream charts:
 1. Create local chart in `flux/infrastructure/<app>/chart/`
 2. Add upstream chart as dependency in `Chart.yaml`
-3. Add custom templates (e.g., `database.yaml` for CNPG clusters)
+3. Add custom templates (e.g., `database.yaml`)
 4. Reference from HelmRelease using GitRepository source
 
 ```yaml
-# flux/infrastructure/<app>/chart/Chart.yaml
+# Chart.yaml
 apiVersion: v2
 name: app-stack
 type: application
@@ -166,43 +118,28 @@ dependencies:
 ```
 
 ### Naming Conventions
+- **Files**: kebab-case: `release-internal.yaml`
+- **K8s resources**: kebab-case with descriptive prefixes
+- **Ansible variables**: snake_case: `talos.cluster_name`
+- **Helm values**: camelCase: `loadBalancerIP`
 
-**Files**: Use kebab-case: `release-internal.yaml`, `ipaddresspool.yaml`
-**Kubernetes resources**: Use kebab-case with descriptive prefixes
-**Ansible variables**: Use snake_case: `talos.cluster_name`, `proxmox.host`
-**Helm values**: Use camelCase: `loadBalancerIP`, `ingressClass`
-
-### Comments and Documentation
-
-**Inline comments**: Use YAML comments (`#`) to explain non-obvious configurations
-**File headers**: Not required for manifest files
-**Complex logic**: Add multi-line comments explaining deployment dependencies
-
-```yaml
-# Port 50000 is open - VM started
-# Port 10250 and 50001 is open - Apply config done
-# Port 6443 is open - bootstrap is done
-```
+### Comments
+- Use `#` for non-obvious configurations
+- Multi-line comments for complex logic/dependencies
 
 ## Secret Management
-
-**Encryption**: Use `age` for bootstrap secrets, Sealed Secrets for Kubernetes
-**Never commit**: Unencrypted secrets (`.gitignore` protects `*secret.yaml`)
-**Age encryption**: Public key `~/.ssh/key.pub`, private key `~/.ssh/jabbas`
+- **Encryption**: `age` for bootstrap, Sealed Secrets for K8s
+- **Never commit**: Unencrypted secrets (`.gitignore` protects `*secret.yaml`)
 
 ```bash
-# Encrypt
-age -R ~/.ssh/key.pub secret.yaml >secret.yaml.age
-
-# Decrypt
-age -d -i ~/.ssh/key secret.yaml.age >secret.yaml
+age -R ~/.ssh/key.pub secret.yaml >secret.yaml.age    # Encrypt
+age -d -i ~/.ssh/jabbas secret.yaml.age >secret.yaml  # Decrypt
 ```
 
 ## Error Handling
-
-**Ansible**: Use `register` and `when` for conditional execution
-**Flux**: Let Flux retry failed reconciliations automatically
-**Timeouts**: Set appropriate timeouts on long-running operations
+- **Ansible**: Use `register` and `when` for conditionals
+- **Flux**: Let Flux retry failed reconciliations
+- **Timeouts**: Set appropriate timeouts for long operations
 
 ```yaml
 - name: Check if file exists
@@ -217,20 +154,17 @@ age -d -i ~/.ssh/key secret.yaml.age >secret.yaml
   when: not iso_file.stat.exists
 ```
 
-## Common Patterns
+## Dependency Chain
 
-### Dependency Chain Order
-
-Follow Flux dependency chain (see `flux/cluster/infrastructure.yaml`):
-1. `sources` (HelmRepositories) - deployed first
-2. Core infrastructure: `metallb-release`, `sealed-secrets`, `snapshot-controller`
-3. Storage: `democratic-csi` (depends on sealed-secrets + snapshot-controller)
-4. Networking: `traefik` (depends on metallb-config)
-5. Database: `cloudnativepg` (depends on storage)
-6. Applications: `authentik` (depends on cloudnativepg + traefik)
+Follow order in `flux/cluster/infrastructure.yaml`:
+1. `sources` (HelmRepositories)
+2. Core: `metallb-release`, `sealed-secrets`, `snapshot-controller`
+3. Storage: `democratic-csi` (needs sealed-secrets + snapshot-controller)
+4. Networking: `traefik` (needs metallb-config)
+5. Database: `cloudnativepg` (needs storage)
+6. Apps: `authentik` (needs cloudnativepg + traefik)
 
 ### GitRepository References
-
 Always use GitRepository source for local charts:
 
 ```yaml
@@ -246,14 +180,15 @@ spec:
 
 ## File References
 
-When referencing code, use format: `file_path:line_number`
+Use format: `file_path:line_number`
 
-Example: "Authentik database cluster defined in `flux/infrastructure/authentik/chart/templates/database.yaml:1`"
+Example: "`flux/infrastructure/authentik/chart/templates/database.yaml:1`"
 
 ## Cluster Information
 
-- **Cluster endpoint**: `https://kube.home:6443`
+- **Endpoint**: `https://kube.home:6443`
 - **Nodes**: 3 control planes (talos1-3, VMs 401-403)
-- **Node specs**: 18 cores, 16GB RAM, 32GB disk each
-- **Talos version**: 1.12.1 (see `bootstrap/site.yaml:39`)
-- **OIDC provider**: Authentik at `https://authentik.dev.home`
+- **Specs**: 18 cores, 16GB RAM, 32GB disk each
+- **Talos**: 1.12.3 (`bootstrap/site.yaml:39`)
+- **OIDC**: Authentik at `https://authentik.dev.home`
+- **Extensions**: iscsi-tools, nvme-cli, qemu-guest-agent, thunderbolt, util-linux-tools
