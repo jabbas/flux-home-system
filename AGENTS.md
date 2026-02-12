@@ -11,6 +11,25 @@ Guidelines for agentic coding assistants working in this Kubernetes home lab inf
 
 Primary technologies: YAML (K8s manifests, Ansible, Flux), Python (Ansible), Bash
 
+## MCP Tools Configuration
+
+### Context7 MCP - Documentation & Code Generation
+
+**Always use Context7 MCP automatically for:**
+
+- Library/API documentation lookup (Helm, Kubernetes, Terraform, Ansible, etc.)
+- Code generation patterns and examples
+- Helm charts and Kubernetes manifests
+- Terraform configurations and modules
+- Setup/installation procedures
+- Configuration syntax and best practices
+
+**When to invoke:** Proactively without explicit user request when dealing with:
+- API documentation questions
+- Generating infrastructure code (K8s, Terraform, Helm)
+- Configuration syntax validation
+- Best practices for tools and libraries
+
 ## Build/Lint/Test Commands
 
 ### Linting
@@ -21,13 +40,21 @@ kubectl apply --dry-run=client -f <file>   # Validate K8s manifest
 ```
 
 ### Bootstrap/Deployment
+
+Ansible playbook creates Proxmox VMs, deploys Talos Linux, and bootstraps the Kubernetes cluster:
+
 ```bash
 cd bootstrap
 for f in $(find . -name \*.age); do age -d -i ~/.ssh/jabbas ${f} >${f%.*}; done  # Decrypt secrets
 uv sync && source .venv/bin/activate  # Setup Python env
-ansible-playbook site.yaml            # Run full playbook
-ansible-playbook site.yaml --tags "create_vms"  # Run specific tags
+ansible-playbook site.yaml            # Create VMs, install Talos, bootstrap cluster
 ```
+
+**What `ansible-playbook site.yaml` does:**
+1. Creates Talos control plane VMs on Proxmox (`create_controlpanes` role)
+2. Generates Talos configuration (`initialize_talos_configuration` role)
+3. Applies configuration to nodes and bootstraps etcd
+4. Outputs kubeconfig for cluster access
 
 ### Flux Operations
 ```bash
