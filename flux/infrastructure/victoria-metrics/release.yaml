@@ -67,9 +67,9 @@ spec:
           resources:
             requests:
               cpu: 50m
-              memory: 64Mi
-            limits:
               memory: 128Mi
+            limits:
+              memory: 512Mi
 
     # Disable vmsingle (using vmcluster instead)
     vmsingle:
