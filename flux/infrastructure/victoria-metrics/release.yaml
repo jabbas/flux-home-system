@@ -49,7 +49,9 @@ spec:
               cpu: 100m
               memory: 512Mi
             limits:
-              memory: 1Gi
+              memory: 2Gi
+          extraArgs:
+            memory.allowedPercent: "20"
 
         vmselect:
           replicaCount: 2
@@ -65,9 +67,9 @@ spec:
           resources:
             requests:
               cpu: 50m
-              memory: 128Mi
+              memory: 64Mi
             limits:
-              memory: 256Mi
+              memory: 128Mi
 
     # Disable vmsingle (using vmcluster instead)
     vmsingle:
@@ -93,9 +95,9 @@ spec:
         resources:
           requests:
             cpu: 50m
-            memory: 128Mi
+            memory: 64Mi
           limits:
-            memory: 256Mi
+            memory: 128Mi
 
     # Alertmanager - HA
     alertmanager:

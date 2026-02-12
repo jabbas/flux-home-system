@@ -17,6 +17,12 @@ spec:
   values:
     deployment:
       kind: DaemonSet
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        memory: "128Mi"
     ports:
       web:
         forwardedHeaders:
