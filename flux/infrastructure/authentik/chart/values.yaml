@@ -4,7 +4,7 @@ fullnameOverride: ""
 
 # Database configuration
 database:
-  instances: 2
+  instances: 3
   size: 0.5Gi
   backupSchedule: "0 2 * * 1"
   snapshotClassName: democratic-csi
