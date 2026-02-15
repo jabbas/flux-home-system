@@ -99,6 +99,15 @@ authentik:
 
   server:
     replicas: 2
+    # Distribute pods across nodes
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: authentik
+            app.kubernetes.io/component: server
     securityContext:
       runAsNonRoot: true
       runAsUser: 1000
