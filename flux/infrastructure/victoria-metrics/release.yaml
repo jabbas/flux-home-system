@@ -27,6 +27,12 @@ spec:
       enabled: true
       operator:
         disable_prometheus_converter: false
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
 
     # VMCluster - HA storage
     vmcluster:
@@ -135,6 +141,12 @@ spec:
     # kube-state-metrics
     kube-state-metrics:
       enabled: true
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
 
     # node-exporter (Prometheus-style)
     # Disabled due to Talos PodSecurity restrictions (requires hostNetwork, hostPID, hostPath)

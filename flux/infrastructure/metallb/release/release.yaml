@@ -6,6 +6,28 @@ metadata:
   namespace: metallb-system
 spec:
   interval: 24h
+  values:
+    controller:
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+    speaker:
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+      frr:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
   chart:
     spec:
       chart: metallb

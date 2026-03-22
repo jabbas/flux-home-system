@@ -14,3 +14,11 @@ spec:
         name: democratic-csi
         namespace: flux-system
   interval: 1m0s
+  values:
+    replicaCount: 3
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 64Mi

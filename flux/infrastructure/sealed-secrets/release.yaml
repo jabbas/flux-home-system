@@ -17,3 +17,9 @@ spec:
   values:
     keyrenewperiod: "219000h"
     secretName: "jabbas-sealed-secrets-key"
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        memory: 128Mi

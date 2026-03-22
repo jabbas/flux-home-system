@@ -99,6 +99,12 @@ authentik:
 
   server:
     replicas: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
     # Distribute pods across nodes
     topologySpreadConstraints:
       - maxSkew: 1
@@ -131,6 +137,12 @@ authentik:
 
   worker:
     replicas: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
     # Distribute pods across nodes
     topologySpreadConstraints:
       - maxSkew: 1

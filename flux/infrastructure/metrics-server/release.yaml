@@ -17,3 +17,9 @@ spec:
   values:
     args:
       - '"--kubelet-insecure-tls=true"'
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        memory: 128Mi
