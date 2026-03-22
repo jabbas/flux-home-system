@@ -1,0 +1,72 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: descheduler
+  namespace: kube-system
+spec:
+  interval: 1m0s
+  chart:
+    spec:
+      chart: descheduler
+      version: "0.35.*"
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: descheduler
+        namespace: flux-system
+  values:
+    # Run as a Deployment (continuous) rather than CronJob so it reacts promptly
+    kind: Deployment
+    replicas: 1
+    # Re-evaluate every 5 minutes
+    deschedulingInterval: 5m
+
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+
+    deschedulerPolicy:
+      profiles:
+        - name: default
+          pluginConfig:
+            - name: DefaultEvictor
+              args:
+                # Do not evict pods on nodes that are under memory pressure
+                nodeFit: true
+                # Do not evict system-critical pods (PriorityClass >= system-cluster-critical)
+                evictSystemCriticalPods: false
+                # Do not evict pods with local storage
+                evictLocalStoragePods: false
+
+            # Evict pods that violate their TopologySpreadConstraints so the
+            # scheduler can re-place them on better nodes. Covers both hard
+            # (DoNotSchedule) and soft (ScheduleAnyway) constraints.
+            - name: RemovePodsViolatingTopologySpreadConstraint
+              args:
+                constraints:
+                  - DoNotSchedule
+                  - ScheduleAnyway
+                topologyBalanceNodeFit: true
+
+            # Evict pods from overloaded nodes toward underutilized ones.
+            # Thresholds are conservative to avoid unnecessary churn.
+            - name: LowNodeUtilization
+              args:
+                thresholds:
+                  cpu: 20
+                  memory: 20
+                targetThresholds:
+                  cpu: 60
+                  memory: 60
+                # Only trigger if at least 1 node is below thresholds
+                numberOfNodes: 1
+
+          plugins:
+            balance:
+              enabled:
+                - RemovePodsViolatingTopologySpreadConstraint
+                - LowNodeUtilization
