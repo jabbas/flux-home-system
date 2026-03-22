@@ -58,6 +58,14 @@ spec:
               memory: 2Gi
           extraArgs:
             memory.allowedPercent: "20"
+          topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: ScheduleAnyway
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: vmstorage
+                  managed-by: vm-operator
 
         vmselect:
           replicaCount: 2
@@ -67,6 +75,14 @@ spec:
               memory: 256Mi
             limits:
               memory: 1Gi
+          topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: ScheduleAnyway
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: vmselect
+                  managed-by: vm-operator
 
         vminsert:
           replicaCount: 2
@@ -76,6 +92,14 @@ spec:
               memory: 128Mi
             limits:
               memory: 512Mi
+          topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: ScheduleAnyway
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: vminsert
+                  managed-by: vm-operator
 
     # Disable vmsingle (using vmcluster instead)
     vmsingle:
@@ -92,6 +116,14 @@ spec:
             memory: 256Mi
           limits:
             memory: 512Mi
+        topologySpreadConstraints:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: vmagent
+                managed-by: vm-operator
 
     # vmalert - HA alerting
     vmalert:
@@ -104,6 +136,14 @@ spec:
             memory: 64Mi
           limits:
             memory: 128Mi
+        topologySpreadConstraints:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: vmalert
+                managed-by: vm-operator
 
     # Alertmanager - HA
     alertmanager:
@@ -117,6 +157,14 @@ spec:
           limits:
             memory: 128Mi
         configSecret: alertmanager-config
+        topologySpreadConstraints:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: vmalertmanager
+                managed-by: vm-operator
 
     # Grafana disabled (using vmui)
     grafana:
