@@ -56,7 +56,7 @@
           cores: 18
           shares: 1000
         memory:
-          balloon: 1024
+          balloon: 0
           limit: 16384
 
     controlpanes:
