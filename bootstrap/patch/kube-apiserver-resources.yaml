@@ -1,0 +1,12 @@
+# Set memory limits on kube-apiserver static pod to prevent the Talos OOM
+# controller from killing it under memory pressure. The apiserver uses ~1GB
+# at runtime but has no limit by default, making it a target for OOM kills
+# on overcommitted nodes. 2Gi limit gives sufficient headroom.
+cluster:
+  apiServer:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
