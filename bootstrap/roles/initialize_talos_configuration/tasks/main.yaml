@@ -56,7 +56,8 @@
       -p @patch/remove-externallb-label.yaml \
       -p @patch/oidc.yaml \
       -p @patch/ghcr-registry-secret.yaml \
-      -p @patch/kube-apiserver-resources.yaml
+      -p @patch/kube-apiserver-resources.yaml \
+      -p @patch/ntp.yaml
   loop: "{{ groups['all'] }}"
   changed_when: false
 
