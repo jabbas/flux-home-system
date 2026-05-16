@@ -11,10 +11,10 @@ spec:
     topologyKey: kubernetes.io/hostname
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: {{ .Values.database.resources.requests.cpu }}
+      memory: {{ .Values.database.resources.requests.memory }}
     limits:
-      memory: 256Mi
+      memory: {{ .Values.database.resources.limits.memory }}
   bootstrap:
     initdb:
       database: authentik

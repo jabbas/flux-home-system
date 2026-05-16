@@ -8,6 +8,12 @@ database:
   size: 0.5Gi
   backupSchedule: "0 2 * * 1"
   snapshotClassName: democratic-csi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
 
 # Admin bootstrap credentials
 admin:
