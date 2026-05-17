@@ -110,7 +110,7 @@ authentik:
         cpu: 100m
         memory: 256Mi
       limits:
-        memory: 512Mi
+        memory: 1Gi
     # Distribute pods across nodes
     topologySpreadConstraints:
       - maxSkew: 1
@@ -148,7 +148,7 @@ authentik:
         cpu: 100m
         memory: 256Mi
       limits:
-        memory: 512Mi
+        memory: 1Gi
     # Distribute pods across nodes
     topologySpreadConstraints:
       - maxSkew: 1
