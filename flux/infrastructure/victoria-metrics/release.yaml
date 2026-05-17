@@ -25,8 +25,12 @@ spec:
     # VM Operator
     victoria-metrics-operator:
       enabled: true
+      crds:
+        plain: true
+        cleanup:
+          enabled: true
       operator:
-        disable_prometheus_converter: true
+        disable_prometheus_converter: false
       resources:
         requests:
           cpu: 25m
