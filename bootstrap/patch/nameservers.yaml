@@ -1,0 +1,8 @@
+# Static nameservers for Talos nodes
+# Ensures DNS is available immediately on boot before CoreDNS is scheduled.
+# OPNsense (10.1.255.2) is primary; Cloudflare (1.1.1.1) is fallback.
+machine:
+  network:
+    nameservers:
+      - 10.1.255.2
+      - 1.1.1.1

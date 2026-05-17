@@ -57,7 +57,8 @@
       -p @patch/oidc.yaml \
       -p @patch/ghcr-registry-secret.yaml \
       -p @patch/kube-apiserver-resources.yaml \
-      -p @patch/ntp.yaml
+      -p @patch/ntp.yaml \
+      -p @patch/nameservers.yaml
   loop: "{{ groups['all'] }}"
   changed_when: false
 
