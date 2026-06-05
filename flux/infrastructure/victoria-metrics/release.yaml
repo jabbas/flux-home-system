@@ -95,7 +95,7 @@ spec:
               cpu: 50m
               memory: 128Mi
             limits:
-              memory: 512Mi
+              memory: 1Gi
           topologySpreadConstraints:
             - maxSkew: 1
               topologyKey: kubernetes.io/hostname
@@ -139,7 +139,7 @@ spec:
             cpu: 50m
             memory: 64Mi
           limits:
-            memory: 128Mi
+            memory: 256Mi
         topologySpreadConstraints:
           - maxSkew: 1
             topologyKey: kubernetes.io/hostname
