@@ -4,7 +4,7 @@ fullnameOverride: ""
 
 # Database configuration
 database:
-  instances: 3
+  instances: 2
   size: 0.5Gi
   backupSchedule: "0 2 * * 1"
   snapshotClassName: democratic-csi
@@ -142,7 +142,7 @@ authentik:
         - authentik.dev.home
 
   worker:
-    replicas: 2
+    replicas: 1
     resources:
       requests:
         cpu: 100m
