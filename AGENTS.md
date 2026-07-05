@@ -66,5 +66,5 @@ Three touchpoints, all required:
 ## Cluster facts
 
 - Endpoint `https://kube.home:6443`, cluster `k8s`, 3 control-plane nodes `talos1-3` (Proxmox VMIDs 401–403 on `pve.home`).
-- Talos pinned in `bootstrap/site.yaml` (currently 1.13.2; extensions: iscsi-tools, nvme-cli, qemu-guest-agent, thunderbolt, util-linux-tools).
+- Talos pinned in `bootstrap/site.yaml` (currently 1.13.5; extensions: iscsi-tools, nvme-cli, qemu-guest-agent, thunderbolt, util-linux-tools).
 - Ingress classes `traefik-internal` / `traefik-external`; services at `*.dev.home`; OIDC via Authentik (`authentik.dev.home`); storage class `zfs-nfs-csi` via democratic-csi (driver config is a SealedSecret).
