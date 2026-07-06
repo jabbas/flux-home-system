@@ -29,14 +29,13 @@ spec:
           trustedIPs:
             - 10.1.255.2
             - 185.170.224.141
-    logs:
-      general:
-        level: ERROR
-      access:
-        enabled: false
+    log:
+      level: ERROR
+    accessLog:
+      enabled: false
       fields:
         headers:
-          defaultmode: keep
+          defaultMode: keep
     podSecurityContext:
       seccompProfile:
         type: RuntimeDefault
