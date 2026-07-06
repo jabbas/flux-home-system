@@ -207,24 +207,5 @@ spec:
 
     # Default alerting rules
     defaultRules:
-      create: true
-      rules:
-        etcd: true
-        general: true
-        k8s: true
-        kubeApiserverAvailability: true
-        kubeApiserverBurnrate: true
-        kubeApiserverHistogram: true
-        kubeApiserverSlos: true
-        kubeControllerManager: true
-        kubelet: true
-        kubeProxy: true
-        kubeSchedulerAlerting: true
-        kubeSchedulerRecording: true
-        kubeStateMetrics: true
-        network: true
-        node: true
-        nodeExporterAlerting: true
-        nodeExporterRecording: true
-        vmagent: true
-        vmhealth: true
+      enabled: true
+      rules: {}
