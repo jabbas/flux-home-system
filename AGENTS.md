@@ -50,6 +50,9 @@ Three touchpoints, all required:
 - **Wrapper chart** when an upstream chart needs extra resources (see `authentik/`, `authentik-blueprints/`): local chart at `flux/infrastructure/<app>/chart/` with upstream as dependency in `Chart.yaml`, custom templates alongside; HelmRelease points at `chart: ./flux/infrastructure/<app>/chart` with GitRepository `flux-system` sourceRef and `reconcileStrategy: Revision`.
 - **`Chart.lock` and `charts/*.tgz` are committed.** After changing chart dependencies, run `helm dependency update` in the chart dir and commit the tgz.
 - Nontrivial HelmReleases use `interval: 30m`, `timeout: 15m`, install/upgrade `remediation.retries: 3`. Apps with RWO PVCs need `deploymentStrategy: Recreate` / `recreatePods: true` to avoid Multi-Attach deadlocks (see grafana).
+- **Chart versions are pinned** (exact `version:` in every HelmRelease). Upgrades arrive as Renovate PRs — review the changelog, check the `validate` workflow, merge. Never remove a pin; to upgrade manually, change the pin in a PR.
+- Wrapper chart dependency bumps (authentik) are two-step: Renovate PRs the `Chart.yaml` change; before merging run `helm dependency update` in the chart dir and commit the updated `Chart.lock` + `charts/*.tgz` to the same PR.
+- Validate chart rendering locally (same gate as CI): `uvx flux-local test --enable-helm --path flux/cluster --sources flux-system` (needs `kustomize` installed).
 
 ## Secrets
 
