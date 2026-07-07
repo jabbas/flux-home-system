@@ -9,7 +9,7 @@ jobs:
   flux-local-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Setup Flux CLI
         uses: fluxcd/flux2/action@v2.9.1
       - name: flux-local test
