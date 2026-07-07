@@ -1,0 +1,22 @@
+---
+name: validate
+"on":
+  pull_request:
+    paths:
+      - "flux/**"
+      - ".github/workflows/validate.yaml"
+jobs:
+  flux-local-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Flux CLI
+        uses: fluxcd/flux2/action@v2.9.1
+      - name: Setup kustomize
+        uses: fluxcd/pkg/actions/kustomize@main
+      - name: flux-local test
+        uses: allenporter/flux-local/action/test@8.4.0
+        with:
+          path: flux/cluster
+          enable-helm: "true"
+          sources: flux-system
