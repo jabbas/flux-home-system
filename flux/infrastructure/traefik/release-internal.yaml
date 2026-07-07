@@ -36,13 +36,9 @@ spec:
               to: websecure
               scheme: https
               permanent: true
-    log:
-      level: ERROR
-    accessLog:
-      enabled: false
-      fields:
-        headers:
-          defaultMode: keep
+    logs:
+      general:
+        level: ERROR
     podSecurityContext:
       seccompProfile:
         type: RuntimeDefault
