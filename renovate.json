@@ -1,0 +1,32 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "timezone": "Europe/Warsaw",
+  "flux": {
+    "fileMatch": ["^flux/.+\\.ya?ml$"]
+  },
+  "helmv3": {
+    "fileMatch": ["^flux/.+/chart/Chart\\.ya?ml$"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["flux", "helmv3"],
+      "automerge": false
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "labels": ["dependencies", "major"]
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "labels": ["dependencies"]
+    },
+    {
+      "matchDepNames": ["traefik"],
+      "groupName": "traefik"
+    }
+  ]
+}
