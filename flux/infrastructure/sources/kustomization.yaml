@@ -13,3 +13,4 @@ resources:
   - cloudnativepg.yaml
   - authentik.yaml
   - grafana.yaml
+# gate re-verification 2026-07-06
