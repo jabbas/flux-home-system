@@ -3,9 +3,9 @@ name: authentik-stack
 description: Authentik with CNPG database and OIDC blueprints for Kubernetes
 type: application
 version: 0.1.0
-appVersion: "2026.5.3"
+appVersion: "2026.5.4"
 
 dependencies:
   - name: authentik
-    version: "2026.5.3"
+    version: "2026.5.4"
     repository: https://charts.goauthentik.io
