@@ -1,6 +1,12 @@
 # Static nameservers for Talos nodes
 # Ensures DNS is available immediately on boot before CoreDNS is scheduled.
-# OPNsense (10.1.255.2) is primary; Cloudflare (1.1.1.1) is fallback.
+# Note: In production, 10.96.0.10 (CoreDNS) is added as the primary nameserver
+# via the initialize_talos_configuration role using a modified controlplane.yaml.
+# This allows Docker Hub image pulls to bypass the OPNsense DNS blocklist for
+# *.cloudfront.docker.com (Docker Hub CDN, active since 2025).
+# CoreDNS has docker.com and cloudfront.net zones forwarding to 1.1.1.1.
+# OPNsense (10.1.255.2) is kept as fallback for local DNS (pve.home, etc.).
+# Cloudflare (1.1.1.1) is final fallback.
 machine:
   network:
     nameservers:
