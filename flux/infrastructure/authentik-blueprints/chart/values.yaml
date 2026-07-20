@@ -51,7 +51,7 @@ oidc:
 
   victoriaMetrics:
     clientId: victoria-metrics-id
-    icon: https://victoriametrics.com/images/logo.svg
+    icon: https://avatars.githubusercontent.com/u/43720803  # VictoriaMetrics GitHub org avatar (old victoriametrics.com/images/logo.svg now 404s)
 
   grafana:
     clientId: grafana-id
