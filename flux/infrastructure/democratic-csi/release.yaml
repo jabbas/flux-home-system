@@ -36,6 +36,8 @@ spec:
           limits:
             memory: 128Mi
       externalProvisioner:
+        extraArgs:
+          - --extra-create-metadata
         resources:
           requests:
             cpu: 10m
