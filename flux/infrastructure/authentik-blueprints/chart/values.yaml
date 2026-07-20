@@ -2,8 +2,18 @@ nameOverride: ""
 fullnameOverride: ""
 
 # Brand configuration
+# NOTE: `domain` here is authentik's brand IDENTIFIER, not the ingress hostname.
+# It MUST match authentik's built-in default brand, which the authentik bootstrap
+# always creates with domain "authentik-default" and default: true.
+# The Recovery Flow blueprint (templates/blueprint-recovery-flow.yaml) sets
+# `default: true` on this brand. If the identifier does NOT match the existing
+# default brand, authentik rejects it with "Only a single brand can be set as
+# default." — which fails the whole blueprint transaction and rolls back the
+# recovery flow, leaving the instance with no way to send recovery emails.
+# Therefore this must stay "authentik-default" so the blueprint UPDATES the
+# existing default brand instead of creating a conflicting second one.
 brand:
-  domain: authentik.dev.home
+  domain: authentik-default
   title: Authentik
 
 # Groups to create
