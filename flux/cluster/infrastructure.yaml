@@ -353,3 +353,34 @@ spec:
       kind: Deployment
       name: tekton-operator
       namespace: tekton-operator
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: tekton-config
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  timeout: 10m0s
+  wait: true
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/tekton/config
+  dependsOn:
+    - name: tekton-release
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: tekton-pipelines-controller
+      namespace: tekton-pipelines
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: tekton-triggers-controller
+      namespace: tekton-pipelines
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: tekton-dashboard
+      namespace: tekton-pipelines

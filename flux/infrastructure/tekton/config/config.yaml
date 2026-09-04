@@ -1,0 +1,22 @@
+---
+apiVersion: operator.tekton.dev/v1alpha1
+kind: TektonConfig
+metadata:
+  name: config
+spec:
+  # profile: all == pipelines + triggers + dashboard
+  profile: all
+  targetNamespace: tekton-pipelines
+  pipeline:
+    # Wymagane, by PipelineRun mógł pobrać definicję z .tekton/ repo aplikacji
+    enable-git-resolver: true
+  pruner:
+    # Stary pruner oparty o CronJob — wyłączony na rzecz tektonpruner
+    disabled: true
+  tektonpruner:
+    disabled: false
+    global-config:
+      enforcedConfigLevel: global
+      ttlSecondsAfterFinished: 3600
+      successfulHistoryLimit: 5
+      failedHistoryLimit: 3
