@@ -1,0 +1,53 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tekton-operator
+  namespace: tekton-operator
+spec:
+  interval: 30m
+  timeout: 15m
+
+  install:
+    remediation:
+      retries: 3
+
+  upgrade:
+    remediation:
+      retries: 3
+
+  chart:
+    spec:
+      chart: tekton-operator
+      version: "0.81.1"
+      sourceRef:
+        kind: HelmRepository
+        name: tekton
+        namespace: flux-system
+
+  values:
+    # UWAGA: chart szablonuje CRD w templates/, więc odinstalowanie tego
+    # HelmRelease (lub usunięcie Kustomization tekton-release z
+    # flux/cluster/infrastructure.yaml) skasuje KASKADOWO wszystkie zasoby
+    # Tektona w klastrze, łącznie z PipelineRunami. Zachowanie zamierzone.
+    installCRDs: true
+
+    operator:
+      # TektonConfig aplikujemy z gita (flux/infrastructure/tekton/config),
+      # nie pozwalamy operatorowi tworzyć go samodzielnie.
+      autoInstallComponents: false
+      defaultTargetNamespace: tekton-pipelines
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
+
+    webhook:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 256Mi
