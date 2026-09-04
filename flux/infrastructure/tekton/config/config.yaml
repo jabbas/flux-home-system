@@ -10,6 +10,22 @@ spec:
   pipeline:
     # Wymagane, by PipelineRun mógł pobrać definicję z .tekton/ repo aplikacji
     enable-git-resolver: true
+  # W operatorze 0.81.1 profile: all instaluje także Chains, Results
+  # (wraz ze StatefulSet postgres + PVC) oraz Pipelines as Code.
+  # Te komponenty są poza zakresem tego wdrożenia — wyłączamy je jawnie,
+  # zostawiając wyłącznie Pipelines + Triggers + Dashboard.
+  chain:
+    disabled: true
+  result:
+    disabled: true
+    is_external_db: false
+  platforms:
+    kubernetes:
+      pipelinesAsCode:
+        enable: false
+  dashboard:
+    # Dashboard ma pozostać włączony (wymagany przez design)
+    readonly: false
   pruner:
     # Stary pruner oparty o CronJob — wyłączony na rzecz tektonpruner
     disabled: true
