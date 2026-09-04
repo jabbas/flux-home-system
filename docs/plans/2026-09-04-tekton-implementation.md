@@ -952,7 +952,9 @@ Jeśli pod pada na PSA mimo Taska 8, albo na `failed to create shim` — przeł�
 - Create: `flux/infrastructure/tekton/ci/secrets.yaml`
 - Modify: `flux/infrastructure/tekton/ci/kustomization.yaml`
 
-Pilotowe repo: **`jabbas/ibakery`**, obraz `ghcr.io/jabbas/ibakery`.
+Pilotowe repo: **`jabbas/homebudget`**, obrazy `ghcr.io/jabbas/homebudget-api` i `ghcr.io/jabbas/homebudget-web`.
+
+**Warunek wstępny:** repo `homebudget` musi być wypchnięte na GitHuba pod `jabbas/homebudget`. Do momentu, w którym `git ls-remote https://github.com/jabbas/homebudget` zwraca referencje, Taski 10-13 nie mają czego wyzwalać.
 
 - [ ] **Step 1: Wygeneruj sekret HMAC**
 
@@ -964,7 +966,7 @@ Zapisz wynik — trafi zarówno do SealedSecret, jak i do konfiguracji webhooka 
 
 - [ ] **Step 2: Utwórz PAT do GHCR**
 
-Na GitHubie: Settings → Developer settings → Personal access tokens → Fine-grained, scope **`write:packages`**, ograniczony do repo `jabbas/ibakery`. Skopiuj token.
+Na GitHubie: Settings → Developer settings → Personal access tokens → Fine-grained, scope **`write:packages`**, ograniczony do repo `jabbas/homebudget`. Skopiuj token.
 
 - [ ] **Step 3: Zapieczętuj oba sekrety**
 
@@ -975,8 +977,8 @@ kubectl -n ci create secret generic tekton-github-webhook \
   --dry-run=client -o yaml \
   | kubeseal --format yaml > /tmp/sealed-webhook.yaml
 
-# Credentials do GHCR dla repo ibakery
-kubectl -n ci create secret docker-registry ghcr-ibakery \
+# Credentials do GHCR dla repo homebudget
+kubectl -n ci create secret docker-registry ghcr-homebudget \
   --docker-server=ghcr.io \
   --docker-username=jabbas \
   --docker-password='<PAT-ze-Stepu-2>' \
@@ -1002,7 +1004,7 @@ git add flux/infrastructure/tekton/ci
 git commit -m "feat(tekton): add sealed secrets for GitHub webhook and GHCR push"
 git push
 flux -n flux-system reconcile kustomization flux-system --with-source
-kubectl -n ci get secret tekton-github-webhook ghcr-ibakery
+kubectl -n ci get secret tekton-github-webhook ghcr-homebudget
 ```
 
 Expected: oba sekrety istnieją, typy odpowiednio `Opaque` i `kubernetes.io/dockerconfigjson`.
@@ -1063,12 +1065,12 @@ roleRef:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: build-ibakery
+  name: build-homebudget
   namespace: ci
 secrets:
-  - name: ghcr-ibakery
+  - name: ghcr-homebudget
 imagePullSecrets:
-  - name: ghcr-ibakery
+  - name: ghcr-homebudget
 ```
 
 - [ ] **Step 2: Potwierdź, że ClusterRole Triggers istnieją**
@@ -1091,7 +1093,7 @@ flux -n flux-system reconcile kustomization flux-system --with-source
 kubectl -n ci get sa
 ```
 
-Expected: `tekton-triggers-sa` i `build-ibakery`.
+Expected: `tekton-triggers-sa` i `build-homebudget`.
 
 ---
 
@@ -1157,7 +1159,9 @@ spec:
             value: $(tt.params.repo-url)
           - name: revision
             value: $(tt.params.revision)
-          - name: image
+          # Prefiks, nie pełna nazwa obrazu — repo może budować kilka obrazów
+          # (homebudget: -api i -web), a nazewnictwo należy do jego pipeline'u
+          - name: image-prefix
             value: ghcr.io/jabbas/$(tt.params.repo-name)
         workspaces:
           - name: source
@@ -1198,7 +1202,7 @@ spec:
           params:
             - name: filter
               value: >-
-                body.repository.full_name in ['jabbas/ibakery'] &&
+                body.repository.full_name in ['jabbas/homebudget'] &&
                 body.ref == 'refs/heads/main'
       bindings:
         - ref: github-push
@@ -1268,7 +1272,7 @@ Expected: Service `el-github` na porcie 8080; pod EventListenera Running; `curl`
 
 - [ ] **Step 5: Skonfiguruj webhook na GitHubie**
 
-W `jabbas/ibakery` → Settings → Webhooks → Add webhook:
+W `jabbas/homebudget` → Settings → Webhooks → Add webhook:
 - Payload URL: `https://tekton.jabbas.eu`
 - Content type: `application/json`
 - Secret: HMAC z Taska 10 Step 1
@@ -1280,14 +1284,24 @@ Expected: GitHub pokazuje dostarczenie testowe (ping) z kodem 2xx lub 400 — sp
 
 ### Task 13: Pipeline w repo aplikacji i test end-to-end
 
-To jedyny task **poza tym repozytorium** — plik trafia do `jabbas/ibakery`.
+To jedyny task **poza tym repozytorium** — plik trafia do `jabbas/homebudget`.
 
-**Files:**
-- Create (w repo `jabbas/ibakery`): `.tekton/pipeline.yaml`
+Specyfika tego repo, uwzględniona w pipelinie:
+- pliki budowania nazywają się **`Containerfile`**, nie `Dockerfile` → `--opt filename=Containerfile`
+- budujemy **dwa obrazy**: `-api` (kontekst `.`, obsługuje też workera — ten sam obraz, inna komenda) i `-web` (kontekst `./frontend`)
+- `docker/storage-init.Containerfile` **nie** trafia do rejestru — to narzędzie stosu deweloperskiego z `docker-compose.yml`
 
-- [ ] **Step 1: Napisz pipeline**
+- [ ] **Step 1: Potwierdź, że repo jest na GitHubie**
 
-`.tekton/pipeline.yaml` w repo `jabbas/ibakery`:
+```bash
+git ls-remote https://github.com/jabbas/homebudget | head -1
+```
+
+Expected: linia z SHA i `HEAD`. Jeśli komenda zwraca `Repository not found` — wypchnij repo, zanim ruszysz dalej; bez tego webhook i git resolver nie mają na czym pracować.
+
+- [ ] **Step 2: Napisz pipeline**
+
+`.tekton/pipeline.yaml` w repo `jabbas/homebudget`:
 
 ```yaml
 ---
@@ -1301,7 +1315,7 @@ spec:
       type: string
     - name: revision
       type: string
-    - name: image
+    - name: image-prefix
       type: string
   workspaces:
     - name: source
@@ -1331,7 +1345,7 @@ spec:
               cd "$(workspaces.source.path)/repo"
               git checkout "$(params.revision)"
 
-    - name: build-and-push
+    - name: build-api
       runAfter:
         - clone
       workspaces:
@@ -1339,13 +1353,16 @@ spec:
           workspace: source
       params:
         - name: image
-          value: $(params.image)
+          value: $(params.image-prefix)-api
         - name: revision
           value: $(params.revision)
-      taskSpec:
+        - name: context
+          value: "."
+      taskSpec: &buildkit-task
         params:
           - name: image
           - name: revision
+          - name: context
         workspaces:
           - name: source
         steps:
@@ -1354,24 +1371,43 @@ spec:
             env:
               - name: BUILDKIT_HOST
                 value: tcp://buildkitd.ci.svc.cluster.local:1234
+              # Tekton creds-init zapisuje tu dockerconfigjson z SA build-homebudget
               - name: DOCKER_CONFIG
                 value: /tekton/creds/.docker
             script: |
               #!/bin/sh
               set -eu
-              cd "$(workspaces.source.path)/repo"
+              cd "$(workspaces.source.path)/repo/$(params.context)"
               buildctl build \
                 --frontend dockerfile.v0 \
                 --local context=. \
                 --local dockerfile=. \
+                --opt filename=Containerfile \
                 --output type=image,name=$(params.image):$(params.revision),push=true \
                 --export-cache type=inline \
                 --import-cache type=registry,ref=$(params.image):cache
+
+    - name: build-web
+      runAfter:
+        - clone
+      workspaces:
+        - name: source
+          workspace: source
+      params:
+        - name: image
+          value: $(params.image-prefix)-web
+        - name: revision
+          value: $(params.revision)
+        - name: context
+          value: frontend
+      taskSpec: *buildkit-task
 ```
+
+`build-api` i `build-web` mają oba `runAfter: [clone]`, więc **budują się równolegle** — dzielą workspace tylko do odczytu. Kotwica YAML (`&buildkit-task` / `*buildkit-task`) trzyma definicję kroku w jednym miejscu; jeśli wolisz jawność kosztem powtórzenia, rozwiń ją ręcznie — Tekton przyjmie oba warianty.
 
 Tag obrazu to pełny SHA commita — niemutowalny, zgodnie ze specem (przygotowanie pod Flux image automation).
 
-- [ ] **Step 2: Commit w repo aplikacji**
+- [ ] **Step 3: Commit w repo aplikacji**
 
 ```bash
 git add .tekton/pipeline.yaml
@@ -1379,15 +1415,15 @@ git commit -m "ci: add Tekton build pipeline"
 git push
 ```
 
-- [ ] **Step 3: Obserwuj wyzwolony run**
+- [ ] **Step 4: Obserwuj wyzwolony run**
 
 ```bash
 kubectl -n ci get pipelinerun -w
 ```
 
-Expected: nowy `PipelineRun` `build-ibakery-*` powstaje w ciągu kilku sekund po pushu.
+Expected: nowy `PipelineRun` `build-homebudget-*` powstaje w ciągu kilku sekund po pushu.
 
-- [ ] **Step 4: Diagnostyka, jeśli run nie powstał**
+- [ ] **Step 5: Diagnostyka, jeśli run nie powstał**
 
 ```bash
 kubectl -n ci logs -l eventlistener=github --tail=50
@@ -1398,17 +1434,18 @@ Typowe przyczyny i reakcje:
 - Brak logów o zdarzeniu → request nie dotarł; sprawdź Recent Deliveries w GitHubie i `curl` ze Stepu 4 Taska 12.
 - `expression returned false` → filtr CEL odrzucił; sprawdź, czy push był do `main` i czy `full_name` repo pasuje do allowlisty.
 
-- [ ] **Step 5: Zweryfikuj wynik builda**
+- [ ] **Step 6: Zweryfikuj wynik builda**
 
 ```bash
 kubectl -n ci get pipelinerun --sort-by=.metadata.creationTimestamp | tail -1
 tkn -n ci pipelinerun logs --last -f
-crane ls ghcr.io/jabbas/ibakery
+crane ls ghcr.io/jabbas/homebudget-api
+crane ls ghcr.io/jabbas/homebudget-web
 ```
 
-Expected: `PipelineRun` w stanie `Succeeded`; w GHCR widoczny tag równy SHA commita.
+Expected: `PipelineRun` w stanie `Succeeded` z **dwoma** zakończonymi taskami budowania; w GHCR oba obrazy mają tag równy SHA commita.
 
-- [ ] **Step 6: Zweryfikuj Dashboard i pruner**
+- [ ] **Step 7: Zweryfikuj Dashboard i pruner**
 
 Otwórz `https://tekton.dev.home` — run musi być widoczny w UI.
 
@@ -1425,10 +1462,12 @@ Expected: po godzinie (`ttlSecondsAfterFinished: 3600`) zakończone runy znikaj�
 - [ ] `flux get kustomizations -A` — `tekton-release`, `tekton-config`, `tekton-ci` wszystkie Ready
 - [ ] `https://tekton.dev.home` wymaga logowania Authentikiem i wpuszcza tylko `tekton-admins`
 - [ ] `https://vmui.dev.home` **nadal** wymaga logowania (regresja po refaktorze outpostu)
-- [ ] Push do `main` w `jabbas/ibakery` produkuje obraz `ghcr.io/jabbas/ibakery:<sha>`
+- [ ] Push do `main` w `jabbas/homebudget` produkuje obrazy `ghcr.io/jabbas/homebudget-{api,web}:<sha>`
 - [ ] `uvx flux-local test --enable-helm --path flux/cluster --sources flux-system` przechodzi
 - [ ] Renovate widzi chart: sprawdź Dependency Dashboard po najbliższym przebiegu — `tekton-operator` ma być na liście
 
 ## Poza zakresem tego planu
 
 Zgodnie ze specem: Flux image automation domykający pętlę CI→CD, Tekton Chains, Tekton Results, middleware z IP-allowlist na zakresy GitHuba.
+
+Dodatkowo, wykryte przy analizie repo pilotowego: **uruchamianie zestawu testów pytest `homebudget` w klastrze**. Testy wymagają Postgresa, Redisa i Garage (S3), więc pipeline musiałby stawiać te zależności jako sidecary albo osobne zasoby — to zauważalnie inny problem niż budowanie obrazu i zasługuje na własny task, dopisany po tym, jak sam build zadziała end-to-end. Pipeline z Taska 13 celowo obejmuje wyłącznie build i push.
