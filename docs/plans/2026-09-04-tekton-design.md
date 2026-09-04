@@ -36,7 +36,29 @@ Dzięki temu Tekton wchodzi jako **zwykły `HelmRelease` z przypiętą wersją**
 
 ### 2. Zakres komponentów
 
-`TektonConfig` z `profile: all` → **Pipelines + Triggers + Dashboard**. Bez Chains i Results — YAGNI, do rozważenia później.
+Docelowo **Pipelines + Triggers + Dashboard**. Bez Chains i Results — YAGNI, do rozważenia później.
+
+**Uwaga zweryfikowana na żywym klastrze (2026-09-04):** w operatorze 0.81.1 `profile: all` NIE oznacza „pipelines + triggers + dashboard", tylko „wszystko, co operator umie" — instaluje dodatkowo Tekton Chains, Tekton Results (ze StatefulSetem Postgresa i PVC) oraz Pipelines as Code, łącznie 18 Deploymentów. Nie istnieje stockowy profil równy dokładnie naszemu zakresowi (`lite` = same Pipelines, `basic` = Pipelines + Triggers, bez Dashboardu).
+
+Dlatego `TektonConfig` używa `profile: all` **z jawnymi wyłącznikami**:
+
+```yaml
+chain:
+  disabled: true
+result:
+  disabled: true
+  is_external_db: false     # pole wymagane przez schemat CRD
+platforms:
+  kubernetes:
+    pipelinesAsCode:
+      enable: false
+```
+
+Ścieżka PaC to `platforms.kubernetes.pipelinesAsCode.enable` — schemat wystawia też warianty `platforms.openshift.*` i `addon.enablePipelinesAsCode`, ale na tym klastrze operator defaultuje właśnie wariant `kubernetes`.
+
+**Ryzyko utrzymaniowe:** konstrukcja „zainstaluj wszystko, potem odejmij" chroni tylko przed komponentami, które znamy dziś. Upgrade operatora może dodać do `all` kolejny komponent, który zainstaluje się po cichu. Przy każdym PR-ze Renovate podbijającym chart należy sprawdzić `kubectl -n tekton-pipelines get deploy` po wdrożeniu.
+
+`tekton-events-controller` pozostaje — jest częścią instalacji Pipelines i nie ma własnego wyłącznika.
 
 ### 3. Webhook publiczny, Dashboard wewnętrzny
 

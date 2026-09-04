@@ -4,7 +4,9 @@ kind: TektonConfig
 metadata:
   name: config
 spec:
-  # profile: all == pipelines + triggers + dashboard
+  # Nie ma stockowego profilu równego naszemu zakresowi: lite == same
+  # Pipelines, basic == Pipelines + Triggers (bez Dashboardu). Bierzemy
+  # więc all i odejmujemy nadmiar wyłącznikami poniżej.
   profile: all
   targetNamespace: tekton-pipelines
   pipeline:
