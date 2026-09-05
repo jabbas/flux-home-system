@@ -384,3 +384,23 @@ spec:
       kind: Deployment
       name: tekton-dashboard
       namespace: tekton-pipelines
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: tekton-ci
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  timeout: 5m0s
+  wait: true
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/tekton/ci
+  dependsOn:
+    - name: tekton-config
+    - name: sealed-secrets
+    - name: democratic-csi
