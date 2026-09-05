@@ -1,3 +1,8 @@
+{{/*
+  Wpis outpostu został przeniesiony do blueprint-outpost.yaml — nie
+  dodawaj go tutaj z powrotem. attrs.providers NADPISUJE listę, więc
+  wpis w blueprincie pojedynczego serwisu kasuje auth pozostałym.
+*/}}
 apiVersion: v1
 kind: ConfigMap
 metadata:

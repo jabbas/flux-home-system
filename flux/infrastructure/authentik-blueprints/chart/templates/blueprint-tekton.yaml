@@ -1,3 +1,11 @@
+{{/*
+  Dodajesz nowy proxy provider? Dwie rzeczy poza tym plikiem są obowiązkowe:
+  1. dopisz providera do listy w blueprint-outpost.yaml (attrs.providers
+     NADPISUJE listę — provider spoza niej nie działa w forwardAuth),
+  2. zarejestruj tę ConfigMapę w blueprints.configMaps w
+     flux/infrastructure/authentik/chart/values.yaml — worker montuje
+     wyłącznie blueprinty z tej jawnej listy.
+*/}}
 apiVersion: v1
 kind: ConfigMap
 metadata:

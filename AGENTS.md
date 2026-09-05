@@ -60,6 +60,16 @@ Three touchpoints, all required:
 - In-cluster: Sealed Secrets. The keypair is restored from `bootstrap/provision/00_sealed_secrets-secret.yaml.age` during bootstrap, so existing SealedSecrets survive cluster rebuilds — never regenerate that key.
 - Secrets needed across namespaces (CA cert, OAuth creds): `flux/infrastructure/shared-secrets/` + reflector annotations.
 
+## Authentik blueprints
+
+Adding a service behind Authentik forwardAuth takes three edits, and missing either of the last two fails silently:
+
+1. New blueprint template in `flux/infrastructure/authentik-blueprints/chart/templates/` (copy `blueprint-tekton.yaml`).
+2. **Register the ConfigMap** in `blueprints.configMaps` in `flux/infrastructure/authentik/chart/values.yaml` — the worker mounts only blueprints from that explicit list; unregistered ones render into the cluster and are simply never loaded.
+3. **Add the proxy provider to `blueprint-outpost.yaml`** — that single shared blueprint owns the embedded outpost's provider list, and `attrs.providers` overwrites rather than appends. A provider missing from it is unknown to the outpost and its host returns errors.
+
+Known wrinkle: on a fresh cluster bootstrap `blueprint-outpost.yaml` may apply before the provider blueprints exist, so it lands in `error` until authentik's next discovery pass. It self-heals; don't hand-fix it in the UI. Diagnose blueprints from the **worker** pod (`kubectl -n authentik exec deploy/authentik-stack-worker -- ls /blueprints/mounted/`) — the server pod has no blueprints mounted.
+
 ## Conventions
 
 - Commits: conventional style with component scope — `fix(victoria-metrics): ...`, `feat(bootstrap): ...`, `docs: ...`.
