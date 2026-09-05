@@ -1,0 +1,92 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: buildkit-cache
+  namespace: ci
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: zfs-nfs-csi
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: buildkitd
+  namespace: ci
+spec:
+  replicas: 1
+  strategy:
+    # PVC jest RWO — Recreate zapobiega blokadzie Multi-Attach przy rolloucie
+    type: Recreate
+  selector:
+    matchLabels:
+      app: buildkitd
+  template:
+    metadata:
+      labels:
+        app: buildkitd
+    # UWAGA: brak ustawień AppArmor (ani przestarzałej adnotacji
+    # container.apparmor.security.beta.kubernetes.io/*, ani appArmorProfile).
+    # Węzły Talos nie mają AppArmor wśród aktywnych LSM
+    # (/sys/kernel/security/lsm = lockdown,capability,yama,selinux,bpf,landlock),
+    # więc jakikolwiek profil AppArmor byłby no-opem.
+    spec:
+      containers:
+        - name: buildkitd
+          image: moby/buildkit:v0.33.0-rootless
+          args:
+            - --addr
+            - tcp://0.0.0.0:1234
+            - --oci-worker-no-process-sandbox
+          readinessProbe:
+            exec:
+              command: ["buildctl", "debug", "workers"]
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          livenessProbe:
+            exec:
+              command: ["buildctl", "debug", "workers"]
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          securityContext:
+            # rootless buildkitd potrzebuje user namespaces — seccomp musi być
+            # wyłączony, dlatego namespace ci ma PSA enforce: privileged
+            seccompProfile:
+              type: Unconfined
+            runAsUser: 1000
+            runAsGroup: 1000
+          ports:
+            - containerPort: 1234
+              name: buildkit
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 4Gi
+          volumeMounts:
+            - name: cache
+              mountPath: /home/user/.local/share/buildkit
+      volumes:
+        - name: cache
+          persistentVolumeClaim:
+            claimName: buildkit-cache
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: buildkitd
+  namespace: ci
+spec:
+  selector:
+    app: buildkitd
+  ports:
+    - port: 1234
+      targetPort: 1234
+      name: buildkit
