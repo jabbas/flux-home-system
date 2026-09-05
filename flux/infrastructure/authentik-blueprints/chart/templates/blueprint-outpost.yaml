@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "authentik-blueprints.fullname" . }}-outpost
+  labels:
+    {{- include "authentik-blueprints.componentLabels" (dict "context" . "component" "outpost") | nindent 4 }}
+data:
+  outpost.yaml: |
+    version: 1
+    metadata:
+      name: Embedded Outpost Providers
+      labels:
+        blueprints.goauthentik.io/instantiate: "true"
+    entries:
+      # UWAGA: attrs.providers NADPISUJE listę providerów outpostu.
+      # Każdy nowy proxy provider MUSI być dopisany tutaj — nigdy we
+      # własnym blueprincie serwisu, bo skasuje pozostałe.
+      - model: authentik_outposts.outpost
+        identifiers:
+          name: "authentik Embedded Outpost"
+        state: present
+        attrs:
+          config:
+            authentik_host: https://authentik.dev.home
+          providers:
+            - !Find [authentik_providers_proxy.proxyprovider, [name, "Victoria Metrics Proxy"]]
+            - !Find [authentik_providers_proxy.proxyprovider, [name, "Tekton Proxy"]]
