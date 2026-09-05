@@ -43,16 +43,25 @@ spec:
             - --addr
             - tcp://0.0.0.0:1234
             - --oci-worker-no-process-sandbox
+          env:
+            # Demon nasłuchuje wyłącznie na TCP (--addr tcp://0.0.0.0:1234) i nie
+            # tworzy gniazda unix. buildctl domyślnie łączy się przez
+            # unix:///run/user/1000/buildkit/buildkitd.sock, którego tu nie ma,
+            # więc bez BUILDKIT_HOST sondy exec zawsze kończyłyby się błędem.
+            - name: BUILDKIT_HOST
+              value: tcp://127.0.0.1:1234
           readinessProbe:
             exec:
               command: ["buildctl", "debug", "workers"]
             initialDelaySeconds: 5
             periodSeconds: 30
+            timeoutSeconds: 5
           livenessProbe:
             exec:
               command: ["buildctl", "debug", "workers"]
             initialDelaySeconds: 5
             periodSeconds: 30
+            timeoutSeconds: 5
           securityContext:
             # rootless buildkitd potrzebuje user namespaces — seccomp musi być
             # wyłączony, dlatego namespace ci ma PSA enforce: privileged
