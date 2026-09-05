@@ -35,6 +35,7 @@ users:
       - kubernetes-admins
       - authentik Admins
       - monitoring-admins
+      - tekton-admins
 
 # OIDC configuration
 oidc:
