@@ -1,18 +1,4 @@
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: buildkit-cache
-  namespace: ci
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: zfs-nfs-csi
-  resources:
-    requests:
-      storage: 20Gi
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -21,7 +7,10 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    # PVC jest RWO — Recreate zapobiega blokadzie Multi-Attach przy rolloucie
+    # Cache leży w emptyDir na dysku węzła. Rolling update uruchomiłby drugi
+    # buildkitd, który zająłby kolejne kilka GB ephemeral-storage na tym samym
+    # węźle (ryzyko eviction / image GC), a i tak startowałby z pustym cache.
+    # Zakładamy dokładnie jeden builder, więc najpierw ubijamy stary pod.
     type: Recreate
   selector:
     matchLabels:
@@ -76,15 +65,21 @@ spec:
             requests:
               cpu: 200m
               memory: 512Mi
+              ephemeral-storage: 8Gi
             limits:
               memory: 4Gi
+              ephemeral-storage: 10Gi
           volumeMounts:
             - name: cache
               mountPath: /home/user/.local/share/buildkit
       volumes:
         - name: cache
-          persistentVolumeClaim:
-            claimName: buildkit-cache
+          # Cache warstw musi leżeć na dysku węzła: rootless BuildKit robi
+          # lchown przy rozpakowywaniu warstw, a NFS (zfs-nfs-csi) z sec=sys
+          # odrzuca to jako EPERM. Konsekwencja: cache ginie przy restarcie
+          # poda. Docelowo blokowy PVC przez democratic-csi iSCSI.
+          emptyDir:
+            sizeLimit: 8Gi
 
 ---
 apiVersion: v1
