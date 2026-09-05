@@ -1,4 +1,24 @@
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: buildkitd-config
+  namespace: ci
+data:
+  # Zaufanie do prywatnego CA (jabbas-ca) wyłącznie dla registry.home.
+  # UWAGA: świadomie NIE podmieniamy systemowego bundla
+  # /etc/ssl/certs/ca-certificates.crt — zamontowanie tam pojedynczego CA
+  # przesłoniłoby wszystkie publiczne roots i zepsuło pull z ghcr.io,
+  # docker.io itd. w sposób trudny do zdiagnozowania.
+  #
+  # Połączenie TLS do rejestru nawiązuje DEMON (buildkitd), więc CA musi
+  # trafić tutaj. Poświadczenia do push idą odwrotną drogą — z klienta
+  # (buildctl, przez DOCKER_CONFIG w kroku Tektona).
+  buildkitd.toml: |
+    [registry."registry.home"]
+      ca = ["/etc/buildkit-certs/ca.crt"]
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +39,11 @@ spec:
     metadata:
       labels:
         app: buildkitd
+      annotations:
+        # Wymusza restart poda po zmianie treści buildkitd.toml — bez tego
+        # ConfigMap zaktualizowałby się w locie, ale demon czyta config
+        # wyłącznie przy starcie.
+        checksum/config: "registry-home-ca-v1"
     # UWAGA: brak ustawień AppArmor (ani przestarzałej adnotacji
     # container.apparmor.security.beta.kubernetes.io/*, ani appArmorProfile).
     # Węzły Talos nie mają AppArmor wśród aktywnych LSM
@@ -32,6 +57,14 @@ spec:
             - --addr
             - tcp://0.0.0.0:1234
             - --oci-worker-no-process-sandbox
+            # Ścieżkę configu podajemy JAWNIE. Domyślna wartość jest zależna
+            # od kontekstu: buildkitd w user namespace (a rootless zawsze w nim
+            # działa) szuka $HOME/.config/buildkit/buildkitd.toml, natomiast
+            # `buildkitd --help` uruchomiony przez kubectl exec pokazuje
+            # /etc/buildkit/buildkitd.toml. Bez --config config po cichu nie
+            # zostałby wczytany.
+            - --config
+            - /etc/buildkit/buildkitd.toml
           env:
             # Demon nasłuchuje wyłącznie na TCP (--addr tcp://0.0.0.0:1234) i nie
             # tworzy gniazda unix. buildctl domyślnie łączy się przez
@@ -72,6 +105,15 @@ spec:
           volumeMounts:
             - name: cache
               mountPath: /home/user/.local/share/buildkit
+            - name: config
+              mountPath: /etc/buildkit
+              readOnly: true
+            # Osobny katalog, nie podkatalog /etc/buildkit — wolumen ConfigMap
+            # jest read-only tmpfs i zagnieżdżanie w nim kolejnego montowania
+            # jest niepotrzebnie kruche.
+            - name: registry-ca
+              mountPath: /etc/buildkit-certs
+              readOnly: true
       volumes:
         - name: cache
           # Cache warstw musi leżeć na dysku węzła: rootless BuildKit robi
@@ -80,6 +122,17 @@ spec:
           # poda. Docelowo blokowy PVC przez democratic-csi iSCSI.
           emptyDir:
             sizeLimit: 8Gi
+        - name: config
+          configMap:
+            name: buildkitd-config
+        - name: registry-ca
+          secret:
+            # Sekret propagowany przez reflectora z namespace shared-secrets,
+            # patrz flux/infrastructure/shared-secrets/jabbas-ca.yaml.
+            secretName: jabbas-ca
+            items:
+              - key: ca.crt
+                path: ca.crt
 
 ---
 apiVersion: v1
