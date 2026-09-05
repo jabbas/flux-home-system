@@ -30,9 +30,11 @@ konfiguracja zdezaktualizuje się przed użyciem.
 przez prywatne `jabbas-ca`. **Odczyt anonimowy, zapis i kasowanie po
 uwierzytelnieniu** jako `jabbas`.
 
-W tym repo nie ma dziś ani jednego odwołania do `registry.home`. Jedyna istniejąca
-konfiguracja rejestrów to `bootstrap/patch/ghcr-registry-secret.yaml` — wyłącznie
-`auth` dla `ghcr.io`, bez mirrorów i bez TLS.
+W tym repo nie ma dziś ani jednego odwołania do `registry.home`. Nie ma też żadnej
+innej konfiguracji rejestrów: `bootstrap/patch/ghcr-registry-secret.yaml` (wyłącznie
+`auth` dla `ghcr.io`, bez mirrorów i bez TLS) został usunięty 2026-09-05 — wszystkie
+obrazy ciągnięte z `ghcr.io` są publiczne, więc uwierzytelnienie niczego nie
+odblokowywało. Patch dla `registry.home` będzie pierwszym wpisem w `machine.registries`.
 
 `jabbas-ca` jest już obecne w dwóch miejscach, ale **żadne z nich nie rozwiązuje
 tego problemu**:
@@ -87,10 +89,16 @@ machine:
 
 Bez sekcji `auth` — pull jest anonimowy.
 
-Stosujemy **stary styl `v1alpha1 machine.registries`**, spójnie z istniejącym
-`ghcr-registry-secret.yaml`. Talos 1.13 wspiera nowy, wielodokumentowy
-`RegistryTLSConfig`, ale mieszanie obu stylów w jednym `talosctl apply` jest
-ryzykowne. Migracja całości to osobna decyzja, poza zakresem.
+Stosujemy **stary styl `v1alpha1 machine.registries`**, spójnie z resztą patchy
+w `bootstrap/patch/`. Talos 1.13 wspiera nowy, wielodokumentowy `RegistryTLSConfig`,
+ale mieszanie obu stylów w jednym `talosctl apply` jest ryzykowne. Migracja całości
+to osobna decyzja, poza zakresem.
+
+Uwaga praktyczna z usuwania `ghcr-registry-secret.yaml` (2026-09-05): machineconfig
+na nodach jest już wielodokumentowy, przez co `talosctl patch machineconfig`
+**odrzuca patche JSON6902** (`JSON6902 patches are not supported for multi-document
+machine configuration`). Do punktowych zmian w `machine.registries` trzeba użyć
+strategic merge patcha, a do skasowania klucza — `$patch: delete`.
 
 Patch trafia jednocześnie do repo (reprodukowalność przy bootstrapie) i na żywy
 klaster przez `talosctl patch machineconfig` — inaczej zadziałałby dopiero po
