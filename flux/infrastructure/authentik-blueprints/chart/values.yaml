@@ -22,6 +22,8 @@ groups:
     superuser: false
   - name: monitoring-admins
     superuser: false
+  - name: tekton-admins
+    superuser: false
 
 # Users to create
 users:
@@ -56,6 +58,9 @@ oidc:
   grafana:
     clientId: grafana-id
     icon: https://grafana.com/static/assets/img/fav32.png
+
+  tekton:
+    icon: https://raw.githubusercontent.com/cncf/artwork/main/projects/tekton/icon/color/tekton-icon-color.svg
 
 # RBAC for OIDC users
 clusterAdminUsers:
