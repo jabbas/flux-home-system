@@ -1,5 +1,9 @@
 ---
-machine:
-  nodeLabels:
+# Control-plane nodes carry this label by default, which keeps them out of
+# external load balancer backends. Here every node is a control plane and also
+# runs ingress, so the label has to go or MetalLB/traefik would have no targets.
+apiVersion: v1alpha1
+kind: KubeNodeConfig
+labels:
     node.kubernetes.io/exclude-from-external-load-balancers:
-      $patch: delete
+        $patch: delete

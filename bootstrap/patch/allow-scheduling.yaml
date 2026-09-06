@@ -1,2 +1,10 @@
-cluster:
-  allowSchedulingOnControlPlanes: yes
+---
+# Schedule ordinary workloads on the control plane: this is a 3-node cluster
+# where every node is a control plane, so the default taint would leave nowhere
+# to run. In 1.14 allowSchedulingOnControlPlanes is gone as a field - removing
+# the taint is the equivalent.
+apiVersion: v1alpha1
+kind: KubeNodeConfig
+taints:
+    node-role.kubernetes.io/control-plane:
+        $patch: delete
