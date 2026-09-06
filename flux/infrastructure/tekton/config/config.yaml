@@ -25,6 +25,20 @@ spec:
     kubernetes:
       pipelinesAsCode:
         enable: false
+        # NIE USUWAĆ tego bloku settings, mimo że PAC jest wyłączony!
+        # Operator 0.81.1 waliduje PACSettings BEZWARUNKOWO — także przy
+        # enable: false. Webhook mutujący dodaje tylko options: {}, ale nie
+        # inicjalizuje settings, więc getHubCatalogs
+        # (pipelines-as-code v0.49.0, pkg/params/settings/default.go:21)
+        # zapisuje do nil mapy i webhook walidujący PANIKUJE
+        # ("assignment to entry in nil map"). Flux pokazuje to mylnie jako EOF,
+        # a TektonConfig nie da się w ogóle utworzyć.
+        # Objawia się wyłącznie przy świeżym CREATE (np. po odbudowie
+        # klastra) — przy UPDATE istniejącego obiektu operator ma już
+        # settings uzupełnione. Wystarczy JEDEN dowolny klucz, by mapa nie
+        # była nil; poniżej domyślna wartość upstreamu, czyli semantycznie no-op.
+        settings:
+          hub-url: "https://api.hub.tekton.dev/v1"
   dashboard:
     # Dashboard ma pozostać włączony (wymagany przez design)
     readonly: false
