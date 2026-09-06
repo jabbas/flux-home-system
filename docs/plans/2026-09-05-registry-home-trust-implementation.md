@@ -166,7 +166,7 @@ kubectl -n default get events --field-selector involvedObject.kind=Pod \
 |---|---|---|
 | `x509: certificate signed by unknown authority` | oczekiwane — brak CA | idź dalej |
 | `not found` / `manifest unknown` | zły tag albo obraz nie dojechał | wróć do Zadania 1 |
-| `no such host` | DNS na nodzie nie rozwiązuje `registry.home` | problem spoza tego planu |
+| `no such host` | znany, niezależny problem — strefa `.home` rozwiązuje się na nodach zawodnie (~50%, dotyczy też `kube.home`), przez politykę `random` w `forward` CoreDNS | **powtórz Joba**, aż zobaczysz `x509` albo `no such host` w kilku próbach z rzędu |
 | `unauthorized` | rejestr wymaga auth przy pullu | sprzeczne z `anonymousPolicy` — zbadaj |
 | pod `Completed` | **obraz był w cache** — test bezwartościowy | wróć do Zadania 1 Krok 3 |
 
@@ -309,10 +309,21 @@ Oczekiwane: wpis obecny, node `Ready`, brak reboota.
 
 ```bash
 TAG=$(cat /tmp/registry-trust-test/tag.txt)
-talosctl -n 10.1.250.11 image pull --namespace cri registry.home/smoke/trust:${TAG}
+timeout 60 talosctl -n 10.1.250.11 image pull --namespace cri registry.home/smoke/trust:${TAG}
+echo "exit=$?"
 ```
 
-Oczekiwane: pobranie kończy się sukcesem, bez `x509`.
+Oczekiwane: `exit=0`, pobranie kończy się sukcesem.
+
+**`timeout` jest obowiązkowy.** `talosctl image pull` przy błędzie TLS **nie zwraca błędu — zawiesza się w nieskończoność**, bo Talos traktuje błędy TLS i sieciowe jako retryable i pętli, nie wypisując nic na stdout. Ustalone empirycznie 2026-09-05. Bez `timeout` ten krok wygląda jak zawieszony terminal, a nie jak nieudany test.
+
+`exit=124` oznacza timeout, czyli niepowodzenie. Prawdziwą przyczynę wyciągnij z logów:
+
+```bash
+talosctl -n 10.1.250.11 logs machined | grep -i 'fetch failed\|x509\|no such host' | tail -10
+```
+
+Uwaga na drugi, niezależny problem: strefa `.home` rozwiązuje się na nodach zawodnie (~50% `no such host`, dotyczy też `kube.home`) przez politykę `random` w `forward` CoreDNS. **Jeśli zobaczysz `no such host` zamiast `x509` — powtórz próbę**, to inna awaria. Diagnoza w pamięci projektu, naprawa poza zakresem tego planu.
 
 To jest moment prawdy — jeśli tu zadziała, reszta to powtórzenie.
 
@@ -324,7 +335,8 @@ talosctl -n 10.1.250.12 patch machineconfig -m no-reboot \
 talosctl -n 10.1.250.12 get machineconfig -o yaml | grep -A4 'registry.home'
 kubectl get node talos2
 TAG=$(cat /tmp/registry-trust-test/tag.txt)
-talosctl -n 10.1.250.12 image pull --namespace cri registry.home/smoke/trust:${TAG}
+timeout 60 talosctl -n 10.1.250.12 image pull --namespace cri registry.home/smoke/trust:${TAG}
+echo "exit=$?"
 ```
 
 - [ ] **Krok 5: talos3**
@@ -335,7 +347,8 @@ talosctl -n 10.1.250.13 patch machineconfig -m no-reboot \
 talosctl -n 10.1.250.13 get machineconfig -o yaml | grep -A4 'registry.home'
 kubectl get node talos3
 TAG=$(cat /tmp/registry-trust-test/tag.txt)
-talosctl -n 10.1.250.13 image pull --namespace cri registry.home/smoke/trust:${TAG}
+timeout 60 talosctl -n 10.1.250.13 image pull --namespace cri registry.home/smoke/trust:${TAG}
+echo "exit=$?"
 ```
 
 - [ ] **Krok 6: Zweryfikuj, że nody i repo mają identyczną konfigurację**
