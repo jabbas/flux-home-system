@@ -69,23 +69,67 @@
   loop: "{{ groups['all'] }}"
   changed_when: false
 
-- name: Wait for Talos install to be ready
+# This is a *transport* gate, nothing more: port 50000 is apid, which answers within
+# seconds of boot and in maintenance mode too, so it says nothing about etcd being
+# ready to bootstrap. Readiness is the retry loop below. What this buys us is a bound
+# on the pathological case: talosctl's dial timeout is ~20 s per call, so if the node
+# is gone, a bare retry loop would burn 30+ minutes of i/o timeouts before failing.
+# Here a missing node fails in 10 minutes with an unambiguous message instead.
+- name: Wait for the Talos API to answer on the first control plane node
   ansible.builtin.wait_for:
-    host: "{{ item }}"
-    port: 50001
-  loop: "{{ groups['all'] }}"
+    host: "{{ groups['all'][0] }}"
+    port: 50000
+    timeout: 600
 
-- name: Bootstrap on the first node
-  ansible.builtin.shell: "talosctl --talosconfig talosconfig --nodes {{ groups['all'][0] }} bootstrap"
-  when: already_provisioned_nodes.values() |select('equalto', false) |list |length==already_provisioned_nodes |length
+# The old guard asked "are all nodes unprovisioned?", which is the wrong question: after
+# a failed run every node answers, so bootstrap was skipped and the playbook hung on the
+# 6443 wait. Ask about the cluster instead. etcd reaches Running only once the cluster is
+# bootstrapped; Preparing/Waiting means it is still sitting in the join loop.
+# A non-zero rc covers both "node unreachable" and "no such service" (node still in
+# maintenance mode) -- both mean "not bootstrapped", so neither may abort the play.
+# The match is anchored to the STATE column on purpose: the EVENTS block replays the
+# service's state history, so a bare "Running" substring would misread a crash-looping
+# etcd as a healthy one.
+- name: Check whether the cluster is already bootstrapped
+  ansible.builtin.command: "talosctl --talosconfig talosconfig --nodes {{ groups['all'][0] }} service etcd"
+  register: initialize_talos_configuration_etcd
   changed_when: false
+  failed_when: false
+
+- name: Record whether the cluster is already bootstrapped
+  ansible.builtin.set_fact:
+    initialize_talos_configuration_bootstrapped: "{{ initialize_talos_configuration_etcd.rc == 0 and initialize_talos_configuration_etcd.stdout is search('(?m)^STATE\\s+Running') }}"
+
+# "FailedPrecondition: bootstrap is not available yet" is a transient state, not an error:
+# etcd is still waiting for /var/lib, the ETCD volume, the cri service and time sync. The
+# window measured here was ~20 s, but a slower disk or an Image Factory pull can stretch
+# it, hence a 10 minute budget (30 x 20 s) rather than a single shot.
+#
+# A second bootstrap against a live cluster is treated as success, not failure, so a
+# re-run can never fail on it. NOTE: the exact error string could not be verified against
+# a live cluster (the nodes were destroyed), so this matches broadly; the etcd guard above
+# is the primary protection and this is only a safety net for the window where etcd has
+# already been bootstrapped but has not yet reached Running.
+- name: Bootstrap etcd on the first node
+  ansible.builtin.command: "talosctl --talosconfig talosconfig --nodes {{ groups['all'][0] }} bootstrap"
+  register: initialize_talos_configuration_bootstrap
+  until: >-
+    initialize_talos_configuration_bootstrap.rc == 0
+    or initialize_talos_configuration_bootstrap.stderr is search('AlreadyExists|etcd data directory is not empty')
+  retries: 30
+  delay: 20
+  changed_when: initialize_talos_configuration_bootstrap.rc == 0
+  failed_when: >-
+    initialize_talos_configuration_bootstrap.rc != 0
+    and not (initialize_talos_configuration_bootstrap.stderr is search('AlreadyExists|etcd data directory is not empty'))
+  when: not initialize_talos_configuration_bootstrapped | bool
 
 - name: Wait for Talos bootstrap to be completed (kubeapi is ready)
   ansible.builtin.wait_for:
     host: "{{ item }}"
     port: 6443
   loop: "{{ groups['all'] }}"
-  timeout: 400
+  timeout: 600
 
 - name: Update talosconfig with endpoint
   connection: local

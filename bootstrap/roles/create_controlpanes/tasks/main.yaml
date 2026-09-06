@@ -1,12 +1,13 @@
 ---
-# Port 50000 is open - VM started
-# Port 10250 and 50001 is open - Apply config done
+# Port 50000 is open - apid answers, i.e. the VM booted. This is the ONLY thing an open
+#   Talos port tells you here: apid answers in maintenance mode too, so no port on this
+#   node is a proxy for "config applied" or "etcd ready to bootstrap". Do not add one.
 # Port 6443 is open - bootstrap is done
 # 1. Spin up VMs
-# 2. Wait for only 50000 port
-# 3. Apply Config if
-# 4. Wait for port 10250 open on first node
-# 6. Wait for port 6443 open on all nodes
+# 2. Wait for port 50000 on every node
+# 3. Apply config (--insecure on nodes still in maintenance mode)
+# 4. Bootstrap the first node, retrying until etcd accepts it
+# 5. Wait for port 6443 open on all nodes
 
 - name: Check if Talos Linux ISO exists locally
   ansible.builtin.stat:
