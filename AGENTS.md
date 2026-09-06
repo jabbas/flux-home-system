@@ -54,6 +54,43 @@ Three touchpoints, all required:
 - Wrapper chart dependency bumps (authentik) are two-step: Renovate PRs the `Chart.yaml` change; before merging run `helm dependency update` in the chart dir and commit the updated `Chart.lock` + `charts/*.tgz` to the same PR.
 - Validate chart rendering locally (same gate as CI): `uvx flux-local test --enable-helm --path flux/cluster --sources flux-system` (needs `kustomize` installed).
 
+## Talos machine config patches
+
+`bootstrap/patch/*.yaml` are **Talos 1.14 multi-document configs**, not the old monolithic
+`v1alpha1` machine config. Talos 1.14 split `v1alpha1` into ~30 separate documents, so each
+patch now carries its own `apiVersion: v1alpha1` + `kind:` (`KubeNodeConfig`,
+`KubeAPIServerConfig`, `KubeAuthenticationConfig`, `ResolverConfig`, `TimeSyncConfig`,
+`SysctlConfig`, `RegistryTLSConfig`) and targets that document only. The installer image is
+**not** a patch — it is a `--install-image` flag on `talosctl gen config`, because any patch
+touching `UnattendedInstallConfig` wipes `provisioning.diskSelector` even when it does not
+mention it.
+
+**The `-p @patch/…` list in `roles/initialize_talos_configuration/tasks/main.yaml` is the
+source of truth for what actually gets applied — not the contents of `bootstrap/patch/`.**
+The directory also holds two files that nothing references: `proxy-ipvs-mode.yaml` (still in
+the legacy `cluster.proxy` format) and `provision-secret.yaml` (+ `.age`, a manifest that
+landed in the wrong directory). They are deliberately left in place; seeing an unmigrated
+file next to the eight live ones does not mean the migration is unfinished.
+
+Four traps that are not visible in the files themselves:
+
+- **`Unstructured` fields are replaced wholesale, not merged.**
+  `KubeAuthenticationConfig.configuration` is one, so the `anonymous` block with `/livez`,
+  `/readyz` and `/healthz` must be repeated in the patch. Drop it and those endpoints simply
+  disappear — `talosctl validate` will not notice, because it does not inspect `Unstructured`
+  content semantically.
+- **Lists append, they do not replace.** Applying `nameservers.yaml` twice yields four
+  nameservers and still validates. The playbook regenerates the config with `--force` on every
+  run, so bootstrap is safe, but these patches must only ever be applied to a **freshly
+  generated** config — never with `talosctl patch` against a live node.
+- **`$patch: delete` is not idempotent.** It fails hard when its target is already gone, which
+  is the same freshness requirement seen from the other side.
+- **Both `KubeNodeConfig` patches are control-plane-only.** `allow-scheduling.yaml` deletes the
+  control-plane taint, which a worker never has, so it dies with `lookup failed` on
+  `worker.yaml`. This is moot today: the playbook applies `controlplane.yaml` to all three
+  nodes and `worker.yaml` is unused. **If workers are ever added, both `KubeNodeConfig`
+  patches have to be scoped to control-plane nodes.**
+
 ## Secrets
 
 - Bootstrap secrets: age-encrypted `*.age` files decrypted in place (`age -d -i ~/.ssh/jabbas f.age > f`); encrypt with `age -R ~/.ssh/key.pub`. Decrypted copies sit in the working tree — never commit them (`.gitignore` covers `*secret.yaml`, `talosconfig`, `controlplane.yaml`, `worker.yaml`, `secrets.yaml`).
