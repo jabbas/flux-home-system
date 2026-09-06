@@ -58,7 +58,8 @@
       -p @patch/kube-apiserver-resources.yaml \
       -p @patch/ntp.yaml \
       -p @patch/nameservers.yaml \
-      -p @patch/sysctls.yaml
+      -p @patch/sysctls.yaml \
+      -p @patch/registry-home.yaml
   loop: "{{ groups['all'] }}"
   changed_when: false
 
