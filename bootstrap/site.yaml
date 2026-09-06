@@ -46,7 +46,18 @@
       ##             - siderolabs/qemu-guest-agent
       ##             - siderolabs/thunderbolt
       ##             - siderolabs/util-linux-tools
-      schematic_id: 8137792da74f62f29f1fa6b6b246ed8258608e342206f4eca3c52acd34fda23c
+      # schematic_id: 8137792da74f62f29f1fa6b6b246ed8258608e342206f4eca3c52acd34fda23c
+      # version: 1.13.5
+
+      ## Dropped nvme-cli and thunderbolt: the nodes are Proxmox q35 VMs whose only
+      ## disk is virtio /dev/vda, so neither extension has a consumer here.
+      ## customization:
+      ##     systemExtensions:
+      ##         officialExtensions:
+      ##             - siderolabs/iscsi-tools
+      ##             - siderolabs/qemu-guest-agent
+      ##             - siderolabs/util-linux-tools
+      schematic_id: 88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b
       version: 1.13.5
 
       domain_name: home
