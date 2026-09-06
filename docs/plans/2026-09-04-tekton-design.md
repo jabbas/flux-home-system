@@ -232,6 +232,35 @@ Tagowanie: `ghcr.io/jabbas/<app>:<git-sha>` — niemutowalne tagi po SHA, nigdy 
 - **Tekton Chains** (podpisywanie i provenance obrazów) i **Results** (trwała historia runów w CNPG).
 - Middleware z IP-allowlist na zakresy egress GitHuba jako dodatkowa warstwa przed EventListenerem.
 
+## Pułapki widoczne dopiero przy odbudowie klastra
+
+Obie poniższe usterki przeżyły cały dzień pracy na działającym klastrze i ujawniły się dopiero po jego odtworzeniu od zera (2026-09-06). Obie są naprawione; ten rozdział istnieje po to, żeby nikt ich nie „posprzątał" z powrotem.
+
+**1. `pipelinesAsCode.enable: false` bez `settings` wywraca webhook operatora.**
+
+Operator 0.81.1 waliduje `PACSettings` bezwarunkowo, także przy `enable: false`. Webhook mutujący dodaje `options: {}`, ale nie inicjalizuje `settings`, więc `getHubCatalogs` pisze do nil mapy i webhook walidujący **panikuje**. Flux raportuje to jako `EOF`, co wygląda na problem sieciowy.
+
+Usterka dotyczy **wyłącznie operacji CREATE**. Na pierwotnym klastrze `TektonConfig` powstał, zanim dodaliśmy stanzę PAC, a późniejszy UPDATE trafiał już na mapę wypełnioną przez operator. Odbudowa wymusza CREATE i błąd występuje za każdym razem.
+
+Dlatego `config.yaml` zawiera pozornie bezcelowy blok:
+
+```yaml
+pipelinesAsCode:
+  enable: false
+  settings:
+    hub-url: "https://api.hub.tekton.dev/v1"
+```
+
+Schemat CRD to `map[string]string` bez wymaganych kluczy — liczy się wyłącznie to, że mapa **nie jest nil**. Użyta wartość jest domyślną wartością upstreamu, czyli semantycznie no-op. **Usunięcie tego bloku zablokuje instalację Tektona przy następnej odbudowie klastra.**
+
+**2. Ingress Dashboardu nie może dzielić Kustomization z `TektonConfig`.**
+
+`Ingress` i `Middleware` żyją w namespace `tekton-pipelines`, który tworzy operator **po** zreconcilowaniu `TektonConfig`. Gdy wszystkie trzy manifesty leżały w jednej Kustomization, Flux nie mógł zaaplikować zestawu (`namespaces "tekton-pipelines" not found`), więc `TektonConfig` nigdy nie powstawał — deadlock rozwiązujący się sam wyłącznie na klastrze, gdzie namespace już istniał.
+
+Stąd podział na `tekton-config` (sam CR) i `tekton-dashboard` (`dependsOn: tekton-config`, korzysta z tego, że pierwsza ma healthChecki na Deploymentach).
+
+**Wniosek metodyczny:** `flux-local test` **nie wykrywa** tej klasy błędów — degraduje na ścieżce `./flux/infrastructure` i nie modeluje kolejności powstawania namespace'ów. Zielony klaster nie jest dowodem, że bootstrap od zera zadziała. Jedynym prawdziwym testem jest odtworzenie klastra.
+
 ## Weryfikacja
 
 Przed wdrożeniem:
