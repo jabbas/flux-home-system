@@ -10,7 +10,7 @@
 
 - name: Generate configuration using secrets.yaml
   connection: local
-  ansible.builtin.shell: "talosctl gen config {{ talos.cluster_name }} {{ talos.endpoint }} --with-secrets {{ talos.secrets_path }} --with-examples=true --with-docs=false --install-disk {{ talos.boot_disk }} --additional-sans {{ groups['all'] | join(',') }} --force"
+  ansible.builtin.shell: "talosctl gen config {{ talos.cluster_name }} {{ talos.endpoint }} --with-secrets {{ talos.secrets_path }} --with-examples=false --with-docs=false --install-disk {{ talos.boot_disk }} --install-image factory.talos.dev/metal-installer/{{ talos.schematic_id }}:v{{ talos.version }} --additional-sans {{ groups['all'] | join(',') }} --force"
   changed_when: false
 
 - name: Authentik Pre-Shared Key File check
@@ -58,9 +58,6 @@
 - name: Apply patches
   ansible.builtin.shell: |
     talosctl --talosconfig talosconfig --nodes {{ item }} apply {{ '--insecure' if not already_provisioned_nodes[item] else '' }} -f controlplane.yaml \
-      -p 'machine:
-        install:
-          image: factory.talos.dev/metal-installer/{{ talos.schematic_id }}:v{{ talos.version }}' \
       -p @patch/allow-scheduling.yaml \
       -p @patch/remove-externallb-label.yaml \
       -p @patch/oidc.yaml \
