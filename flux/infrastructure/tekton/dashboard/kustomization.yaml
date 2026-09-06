@@ -1,0 +1,14 @@
+---
+# UWAGA: tych manifestow NIE wolno przenosic z powrotem do tekton-config.
+# Obie zasoby zyja w namespace "tekton-pipelines", ktory tworzy dopiero
+# operator Tektona po zreconcilowaniu CR-a TektonConfig. Flux waliduje
+# i aplikuje caly zestaw manifestow razem, wiec na swiezym klastrze
+# Ingress przerywa aplikacje bledem "namespaces tekton-pipelines not found",
+# przez co TektonConfig nigdy nie powstaje - twardy deadlock bootstrapu.
+# Dlatego stanowia osobna Kustomizacje Fluxa (tekton-dashboard) zalezna
+# od tekton-config, ktory ma healthChecks na Deploymentach w tym namespace.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - middleware.yaml
+  - ingress.yaml

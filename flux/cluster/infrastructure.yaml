@@ -404,3 +404,28 @@ spec:
     - name: tekton-config
     - name: sealed-secrets
     - name: democratic-csi
+
+# Ingress i Middleware Dashboardu sa celowo oddzielone od tekton-config.
+# Zyja w namespace "tekton-pipelines", ktory tworzy dopiero operator Tektona
+# po zreconcilowaniu CR-a TektonConfig. Trzymane razem z config.yaml
+# blokuja bootstrap swiezego klastra: Flux aplikuje caly zestaw naraz, Ingress
+# wywala sie na braku namespace, apply jest przerywany i TektonConfig nigdy
+# nie powstaje. tekton-config ma healthChecks na Deploymentach w tym
+# namespace, wiec tutaj namespace na pewno juz istnieje.
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: tekton-dashboard
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  timeout: 5m0s
+  wait: true
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/tekton/dashboard
+  dependsOn:
+    - name: tekton-config
