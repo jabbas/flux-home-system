@@ -1,4 +1,13 @@
 ---
+# Cluster PKI (cluster CA, etcd CA, service account key) lives only on disk and is
+# never committed. Generate it on a fresh clone; never overwrite an existing bundle,
+# because that would break access to a running cluster.
+- name: Generate Talos secrets bundle if missing
+  connection: local
+  ansible.builtin.command: "talosctl gen secrets --output-file {{ talos.secrets_path }}"
+  args:
+    creates: "{{ talos.secrets_path }}"
+
 - name: Generate configuration using secrets.yaml
   connection: local
   ansible.builtin.shell: "talosctl gen config {{ talos.cluster_name }} {{ talos.endpoint }} --with-secrets {{ talos.secrets_path }} --with-examples=true --with-docs=false --install-disk {{ talos.boot_disk }} --additional-sans {{ groups['all'] | join(',') }} --force"
