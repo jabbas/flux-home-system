@@ -1,7 +1,9 @@
+---
 # Rootless containers (BuildKit in the `ci` namespace) need user namespaces.
 # Talos ships with user.max_user_namespaces=0, which makes rootlesskit fail at
 # startup with a misleading ENOSPC ("no space left on device"). This sysctl is
 # not namespaced, so it cannot be set from a pod's securityContext.
-machine:
-  sysctls:
+apiVersion: v1alpha1
+kind: SysctlConfig
+params:
     user.max_user_namespaces: "1048576"

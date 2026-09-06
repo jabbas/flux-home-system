@@ -1,9 +1,14 @@
+---
 # NTP configuration for Talos nodes
 # OPNsense (10.1.255.2) is the primary server; public servers are fallbacks
 # in case OPNsense is unreachable during boot (e.g. after a Proxmox reboot).
-machine:
-  time:
+# useNTS must stay false and explicit: NTS defaults to on when the config is
+# absent, and NTS rejects bare IP addresses - 10.1.255.2 would fail validation.
+apiVersion: v1alpha1
+kind: TimeSyncConfig
+ntp:
+    useNTS: false
     servers:
-      - 10.1.255.2
-      - time.cloudflare.com
-      - pool.ntp.org
+        - 10.1.255.2
+        - time.cloudflare.com
+        - pool.ntp.org
