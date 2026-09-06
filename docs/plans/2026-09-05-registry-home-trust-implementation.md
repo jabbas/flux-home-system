@@ -71,10 +71,15 @@ RUN echo "registry.home trust probe" > /probe.txt
 CMD ["cat", "/probe.txt"]
 EOF
 
-podman build -t registry.home/smoke/trust:${TAG} .
+podman build --platform linux/amd64 -t registry.home/smoke/trust:${TAG} .
 podman login registry.home -u jabbas
 podman push registry.home/smoke/trust:${TAG}
 ```
+
+**`--platform linux/amd64` jest obowiązkowy.** Nody są amd64, a podman machine na
+Apple Silicon domyślnie zbuduje arm64. Obraz wtedy **pobierze się poprawnie**, ale
+kontener padnie na `exec /bin/cat: exec format error` — czyli test zaliczy pull,
+a wywali się na uruchomieniu, co maskuje wynik. Sprawdzone empirycznie 2026-09-06.
 
 Unikalny tag ze znacznikiem czasu jest istotny: gwarantuje, że żaden node nie ma
 tego obrazu w cache.
@@ -355,15 +360,23 @@ echo "exit=$?"
 
 ```bash
 for ip in 10.1.250.11 10.1.250.12 10.1.250.13; do
-  echo "=== $ip ==="
+  printf '%-15s' "$ip"
   talosctl -n $ip get machineconfig -o yaml \
-    | grep -A3 'registry.home' | grep 'ca:' | md5
+    | grep -A3 'registry.home' | grep 'ca:' | awk '{print $2}' | sort -u | md5
 done
-grep 'ca:' bootstrap/patch/registry-home.yaml | md5
+printf '%-15s' "repo"
+grep 'ca:' bootstrap/patch/registry-home.yaml | awk '{print $2}' | md5
 ```
 
 Oczekiwane: cztery identyczne sumy. Rozjazd repo z żywym klastrem ujawniłby się
 dopiero przy następnym bootstrapie — czyli w najgorszym możliwym momencie.
+
+**Porównuj samą wartość CA (`awk '{print $2}'`), nie całą linię.** Naiwne
+`grep 'ca:' | md5` zawsze zgłosi rozjazd, nawet gdy konfiguracja jest poprawna:
+wcięcie w wyjściu `talosctl` (24 spacje) różni się od wcięcia w pliku patcha
+(10 spacji), a `get machineconfig -o yaml` zwraca **dwa dokumenty**, więc node daje
+dwie linie `ca:`, a repo jedną. Stąd `sort -u`. Fałszywy alarm zweryfikowany
+empirycznie 2026-09-06.
 
 - [ ] **Krok 7: Sprawdź zdrowie klastra**
 
@@ -384,17 +397,28 @@ Job z Zadania 2 mógłby teraz przejść z cache'a, bo Zadanie 4 pobrało obraz 
 wszystkie trzy nody. Żeby test sprawdzał realny pull, wyczyść cache:
 
 ```bash
-TAG=$(cat /tmp/registry-trust-test/tag.txt)
 for ip in 10.1.250.11 10.1.250.12 10.1.250.13; do
-  DIGEST=$(talosctl -n $ip image list --namespace cri \
-    | grep "registry.home/smoke/trust:${TAG}" | awk '{print $4}')
-  [ -n "$DIGEST" ] && talosctl -n $ip image remove --namespace cri "$DIGEST"
+  talosctl -n $ip image list --namespace cri | grep 'registry.home/smoke/trust' \
+    | awk '{print $2}' | while read -r REF; do
+      talosctl -n $ip image remove --namespace cri "$REF"
+    done
 done
 ```
 
-Uwaga: `talosctl image remove` po tagu jest **cichym no-opem** — obraz siedzi pod
-referencją z digestem. Ustalone empirycznie 2026-09-05. Dlatego usuwamy po digeście
-i weryfikujemy skutek.
+Dwie pułapki:
+
+`talosctl image remove` **po samym tagu jest cichym no-opem** (RC=0, obraz zostaje) —
+ten sam obraz figuruje na liście dwukrotnie: raz pod referencją z tagiem, raz pod
+referencją z digestem (`repo@sha256:...`). Dlatego iterujemy po **wszystkich**
+referencjach dotyczących tego repozytorium, a nie po jednej. Ustalone empirycznie
+2026-09-05.
+
+**Kolumna 2 wyjścia `image list` to referencja, i to jej oczekuje `image remove`.**
+Kolumna 3 to digest, kolumna 4 to rozmiar — `awk '{print $4}'` zwraca więc `4.2`,
+a nie digest. Przekazanie tego do `image remove` na pewno nie usuwa właściwego
+obrazu, przez co test pozytywny zaliczyłby się z cache'a i niczego nie dowiódł.
+Układ kolumn zweryfikowany empirycznie 2026-09-06 (Talos 1.13.5); pętla po
+referencjach z kolumny 2 przetestowana i skuteczna — po niej `grep -c` daje `0`.
 
 ```bash
 for ip in 10.1.250.11 10.1.250.12 10.1.250.13; do
@@ -456,9 +480,10 @@ Oczekiwane: `202`.
 ```bash
 TAG=$(cat /tmp/registry-trust-test/tag.txt)
 for ip in 10.1.250.11 10.1.250.12 10.1.250.13; do
-  DIGEST=$(talosctl -n $ip image list --namespace cri \
-    | grep "registry.home/smoke/trust" | awk '{print $4}')
-  [ -n "$DIGEST" ] && talosctl -n $ip image remove --namespace cri "$DIGEST"
+  talosctl -n $ip image list --namespace cri | grep 'registry.home/smoke/trust' \
+    | awk '{print $2}' | while read -r REF; do
+      talosctl -n $ip image remove --namespace cri "$REF"
+    done
 done
 
 podman rmi registry.home/smoke/trust:${TAG} 2>/dev/null || true
@@ -488,7 +513,8 @@ Miejsce w rejestrze zwolni się po przejściu GC zota (`gcDelay: 1h`) — pusty 
 obrazu nie ma na żadnym nodzie, a tag jest unikalny.
 
 **`talosctl image remove` po tagu nic nie robi.** Cichy no-op z RC=0 — usuwamy po
-digeście i weryfikujemy skutek.
+wszystkich referencjach z kolumny 2 wyjścia `image list` (tag i digest) i weryfikujemy
+skutek. Uwaga: kolumna 4 to rozmiar, nie digest.
 
 **Trzy nody control-plane.** Zmiana `machine.registries` nie wymaga reboota, ale
 dotyka całej płaszczyzny sterowania. Sekwencyjnie, `-m no-reboot`, weryfikacja po
