@@ -1,0 +1,111 @@
+---
+# Mapowanie pol z payloadu "push" GitHuba na parametry TriggerTemplate.
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: github-push
+  namespace: ci
+spec:
+  params:
+    - name: repo-url
+      value: $(body.repository.clone_url)
+    - name: repo-name
+      value: $(body.repository.name)
+    - name: revision
+      value: $(body.after)
+---
+# Szablon PipelineRunu. Sama definicja Pipeline'u NIE jest w tym repo —
+# jest pobierana git resolverem z repozytorium aplikacji (.tekton/pipeline.yaml)
+# z dokladnie tej rewizji, ktora przyszla w webhooku.
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: build-from-repo
+  namespace: ci
+spec:
+  params:
+    - name: repo-url
+      description: Adres HTTPS repozytorium (clone_url z payloadu)
+    - name: repo-name
+      description: Nazwa repozytorium — uzywana w nazwie PipelineRunu, SA i obrazu
+    - name: revision
+      description: SHA commita do zbudowania
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: build-$(tt.params.repo-name)-
+        namespace: ci
+      spec:
+        taskRunTemplate:
+          # SA per repozytorium — tworzone osobno, dopiero gdy repo istnieje.
+          serviceAccountName: build-$(tt.params.repo-name)
+        pipelineRef:
+          resolver: git
+          params:
+            - name: url
+              value: $(tt.params.repo-url)
+            - name: revision
+              value: $(tt.params.revision)
+            - name: pathInRepo
+              value: .tekton/pipeline.yaml
+        params:
+          - name: repo-url
+            value: $(tt.params.repo-url)
+          - name: revision
+            value: $(tt.params.revision)
+          - name: image-prefix
+            value: registry.home/$(tt.params.repo-name)
+        workspaces:
+          - name: source
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                storageClassName: zfs-nfs-csi
+                resources:
+                  requests:
+                    storage: 5Gi
+---
+# Publiczny punkt wejscia dla webhooka GitHuba (tekton.jabbas.eu).
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: github
+  namespace: ci
+spec:
+  serviceAccountName: tekton-triggers-sa
+  triggers:
+    - name: github-push
+      interceptors:
+        # 1) Weryfikacja HMAC (X-Hub-Signature-256) — odrzuca wszystko,
+        #    co nie zostalo podpisane sekretem webhooka.
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: tekton-github-webhook
+                secretKey: secretToken
+            - name: eventTypes
+              value:
+                - push
+        # 2) Allowlista repozytoriow + tylko galaz main.
+        #
+        # UWAGA BEZPIECZENSTWA: jesli kiedykolwiek dodasz tu trigger na
+        # `pull_request`, filtr CEL MUSI dodatkowo sprawdzac
+        #   body.pull_request.head.repo.full_name == body.repository.full_name
+        # W przeciwnym razie PR z forka wykona dowolny kod z .tekton/pipeline.yaml
+        # (pobierany git resolverem z rewizji atakujacego) na koncie z
+        # poswiadczeniami do pushowania obrazow do registry.home.
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.repository.full_name in ['jabbas/homebudget'] &&
+                body.ref == 'refs/heads/main'
+      bindings:
+        - ref: github-push
+      template:
+        ref: build-from-repo

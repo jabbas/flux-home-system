@@ -5,3 +5,6 @@ resources:
   - namespace.yaml
   - buildkit.yaml
   - secrets.yaml
+  - rbac.yaml
+  - eventlistener.yaml
+  - ingress.yaml
