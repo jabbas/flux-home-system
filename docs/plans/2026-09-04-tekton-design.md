@@ -6,7 +6,7 @@ Data: 2026-09-04
 
 Uruchomić Tekton w klastrze do dwóch zastosowań:
 
-1. **Budowanie obrazów kontenerów** własnych aplikacji i push do GHCR.
+1. **Budowanie obrazów kontenerów** własnych aplikacji i push do prywatnego rejestru.
 2. **CI dla repozytoriów GitHub** — testy i lint uruchamiane w klastrze, wyzwalane webhookiem.
 
 Zadania operacyjne (backupy, migracje) są możliwe na tej samej platformie, ale nie są przedmiotem tego designu.
@@ -192,7 +192,7 @@ Opcja „pipeline w repo aplikacji" oznacza, że kod z repo definiuje, co wykona
    ```
    plus **allowlista repozytoriów** w EventListenerze. Bez tego dowolny PR z forka może podmienić `.tekton/pipeline.yaml` i wynieść sekrety.
 
-3. **ServiceAccount per repozytorium** — każde repo dostaje własny SA w `ci` z własnym sekretem `dockerconfigjson` (PAT ze scope `write:packages`). Skompromitowane repo wynosi wyłącznie swój token, nie dostęp do wszystkich obrazów.
+3. **ServiceAccount per repozytorium** — każde repo dostaje własny SA w `ci`. Dziś wszystkie korzystają ze wspólnego sekretu `registry-home-push` (konto `tekton`, bez prawa kasowania), bo zot uwierzytelnia po htpasswd i mnożenie kont na repozytorium nie ma dobrego mechanizmu. Rozdzielenie per repo pozostaje możliwe (`accessControl` zota wspiera polityki na prefiks repozytorium) i warto po nie sięgnąć, gdy budowanych aplikacji będzie więcej.
 
 Koszt utrzymania: dodanie repo do CI = jeden SA + jeden SealedSecret + wpis w allowliście, w tym repo. Sam pipeline pozostaje po stronie aplikacji.
 
@@ -224,7 +224,19 @@ Kaniko jest **zarchiwizowane** i nie dostaje poprawek — odpada. Używamy Build
 
 **Ryzyko do zweryfikowania jako pierwszy krok implementacji:** Talos egzekwuje Pod Security Admission na poziomie `baseline`, a rootless BuildKit zwykle wymaga `seccompProfile: Unconfined`, czego baseline zabrania. Prawdopodobnie namespace `ci` będzie potrzebował etykiety `pod-security.kubernetes.io/enforce: privileged`. Nie zakładamy tego z góry — najpierw test, czy BuildKit wstaje bez podnoszenia uprawnień. Fallback: Buildah w trybie `vfs`.
 
-Tagowanie: `ghcr.io/jabbas/<app>:<git-sha>` — niemutowalne tagi po SHA, nigdy `latest`.
+Tagowanie: `registry.home/<app>:<git-sha>` — niemutowalne tagi po SHA, nigdy `latest`.
+
+### Rejestr docelowy: `registry.home`, nie GHCR
+
+Pierwotnie design zakładał GHCR. Zmienione 2026-09-06, po tym jak `registry.home` (zot w LXC 1002) stał się dostępny: prywatny, bez limitów, bez tokenów GitHuba do rotowania, a obrazy budowane w domu nie muszą wychodzić na zewnątrz.
+
+Konsekwencje, wszystkie zweryfikowane na żywo:
+
+- **Pull nie wymaga poświadczeń.** Rejestr ma anonimowy odczyt, więc nie ma `imagePullSecrets` do propagowania po namespace'ach. Zaufanie TLS na nodach zapewnia `RegistryTLSConfig` w konfiguracji Talosa (osobny projekt, `docs/plans/2026-09-05-registry-home-trust-*.md`).
+- **CA dla BuildKita wskazujemy jawnie w `buildkitd.toml`**, nie przez podmianę systemowego bundla — ta druga droga zerwałaby zaufanie do `docker.io` i `ghcr.io`. CA trafia do namespace'u `ci` przez reflector (`shared-secrets/jabbas-ca.yaml`).
+- **Poświadczenia i zaufanie leżą po przeciwnych stronach.** Poświadczenia płyną z klienta (`buildctl`, przez `DOCKER_CONFIG` w kroku Tektona), ale połączenie TLS nawiązuje demon. Konfiguracja jednej strony bez drugiej nie działa.
+- **CI używa osobnego konta `tekton`** z uprawnieniami `read/create/update` — **bez `delete`**. Konto `jabbas` (pełne prawa) dzieli hasło z rootem LXC, więc nie nadaje się dla runnera CI. Zweryfikowane: push jako `tekton` → 201, DELETE → 403.
+- **Retencja jest po stronie rejestru**, nie pipeline'u: tagi semver trzymane bez limitu, pozostałe (per-commit SHA) — 10 ostatnich na repozytorium. Bez tego 50 GB quoty zapełniłoby się monotonicznie.
 
 ## Poza zakresem (future work)
 
