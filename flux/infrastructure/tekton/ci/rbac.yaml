@@ -35,3 +35,16 @@ subjects:
   - kind: ServiceAccount
     name: tekton-triggers-sa
     namespace: ci
+---
+# SA per repozytorium: PipelineRun dla repo <name> leci jako build-<name>.
+# Sekret registry-home-push to konto `tekton` w zocie — ma create/update,
+# NIE ma delete, wiec skompromitowany pipeline nie wyczysci rejestru.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: build-homebudget
+  namespace: ci
+secrets:
+  - name: registry-home-push
+imagePullSecrets:
+  - name: registry-home-push
