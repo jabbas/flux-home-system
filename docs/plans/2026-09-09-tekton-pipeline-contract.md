@@ -176,7 +176,13 @@ Sukcesem jest tag równy SHA commita w obu repozytoriach obrazów. Sam `Succeede
 
 Po pierwszym udanym buildzie zostaje jeszcze test pełnej ścieżki: prawdziwy push do `main`, który zweryfikuje trzy odcinki nietestowane do tej pory — `revision` z payloadu webhooka, `ServiceAccount build-homebudget` i workspace na PVC.
 
-## Retencja — co przetrwa, a co zniknie
+## Sprzątanie PipelineRunów — uwaga na mylącą konfigurację
+
+Zakończone runy znikają po **godzinie** (`ttlSecondsAfterFinished: 3600`, historia 5 udanych / 3 nieudanych). Workspace PVC ma `ownerReference` na `PipelineRun`, więc jest kasowany razem z nim — PVC nie kumulują się po każdym buildzie.
+
+**Pułapka diagnostyczna:** w `TektonConfig` pole `spec.pruner` jest `disabled: true`, ale sprzątaniem zajmuje się **osobny komponent `tektonpruner`**, który jest włączony. Ktoś, kto sprawdzi tylko `spec.pruner`, wyciągnie odwrotny wniosek. Prawdziwa konfiguracja jest w `spec.tektonpruner.global-config`.
+
+## Retencja obrazów — co przetrwa, a co zniknie
 
 Polityka jest po stronie rejestru, nie pipeline'u:
 
