@@ -71,7 +71,7 @@ Dashboard nie ma własnego uwierzytelniania — publiczne wystawienie oznaczało
 
 `Pipeline`/`Task` żyją w `.tekton/` repo budowanej aplikacji i są pobierane w runtime przez **git resolver** Tektona, w wersji z budowanego commita. `flux-home-system` dostarcza platformę, `flux-homeapps` instaluje aplikacje — a jak się aplikację buduje, wie jej własne repo.
 
-Konsekwencja: dodanie nowego projektu do CI nie wymaga PR-a w repozytoriach GitOps (poza jednorazowym SA + sekretem, patrz §Bezpieczeństwo).
+Konsekwencja: dodanie nowego projektu do CI nie wymaga PR-a w repozytoriach GitOps (poza jednorazowym SA + wpisem w allowliście; PAT dla resolvera jest wspólny, patrz §Bezpieczeństwo).
 
 ## Architektura
 
@@ -194,7 +194,9 @@ Opcja „pipeline w repo aplikacji" oznacza, że kod z repo definiuje, co wykona
 
 3. **ServiceAccount per repozytorium** — każde repo dostaje własny SA w `ci`. Dziś wszystkie korzystają ze wspólnego sekretu `registry-home-push` (konto `tekton`, bez prawa kasowania), bo zot uwierzytelnia po htpasswd i mnożenie kont na repozytorium nie ma dobrego mechanizmu. Rozdzielenie per repo pozostaje możliwe (`accessControl` zota wspiera polityki na prefiks repozytorium) i warto po nie sięgnąć, gdy budowanych aplikacji będzie więcej.
 
-Koszt utrzymania: dodanie repo do CI = jeden SA + jeden SealedSecret + wpis w allowliście, w tym repo. Sam pipeline pozostaje po stronie aplikacji.
+4. **Uwierzytelnienie git resolvera do prywatnych repozytoriów** — `.tekton/pipeline.yaml` z repo prywatnego nie da się pobrać anonimowo, więc `pipelineRef` w TriggerTemplate przekazuje parametr `gitToken` wskazujący na sekret `github-pat-readonly` w ns `ci` (wartością parametru jest **nazwa sekretu**, nie token; klucz to domyślnie `token`). Ten PAT jest read-only i obejmuje **wszystkie** repozytoria właściciela — jest współdzielony celowo. Onboarding nowego repo to zatem: wpis w allowliście CEL EventListenera + ServiceAccount `build-<repo>` — **bez wystawiania nowego tokenu**. Pułapka: git resolver po cichu ignoruje nieznane parametry, więc literówka w nazwie (`gittoken`, `git-token`) nie daje błędu walidacji, tylko `clone error: authentication required` — komunikat nie do odróżnienia od złego lub wygasłego tokenu.
+
+Koszt utrzymania: dodanie repo do CI = jeden SA + wpis w allowliście, w tym repo (token jest wspólny). Sam pipeline pozostaje po stronie aplikacji.
 
 ## Refaktor: wpis outpostu w blueprintach Authentika
 

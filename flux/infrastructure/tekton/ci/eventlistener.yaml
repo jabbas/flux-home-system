@@ -49,9 +49,15 @@ spec:
               value: $(tt.params.revision)
             - name: pathInRepo
               value: .tekton/pipeline.yaml
-            # PAT do prywatnego repozytorium. UWAGA: wartoscia jest NAZWA
+            # PAT do prywatnych repozytoriow. UWAGA: wartoscia jest NAZWA
             # sekretu w namespace ci (tam, gdzie powstaje PipelineRun), a nie
             # sam token. Klucz w sekrecie to domyslnie `token` (gitTokenKey).
+            #
+            # To JEDEN token read-only obejmujacy WSZYSTKIE repozytoria
+            # wlasciciela na GitHubie i jest wspoldzielony celowo. Dodanie
+            # nowego repozytorium do CI NIE wymaga wystawiania nowego tokenu
+            # ani nowego sekretu — wystarczy wpis w allowliscie CEL nizej
+            # oraz ServiceAccount `build-<repo>`.
             #
             # UWAGA NA LITEROWKI: git resolver po cichu ignoruje nieznane
             # parametry — zla nazwa (np. `gittoken`, `git-token`) nie da
@@ -59,7 +65,7 @@ spec:
             # required`, czyli komunikat nie do odroznienia od braku
             # konfiguracji albo od nieprawidlowego/wygaslego tokenu.
             - name: gitToken
-              value: github-pat-homebudget
+              value: github-pat-readonly
         params:
           - name: repo-url
             value: $(tt.params.repo-url)
