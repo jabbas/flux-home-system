@@ -69,34 +69,6 @@ spec:
     - name: sources
     - name: metallb-release
 
-# Ta Kustomizacja jest wycofywana: sciezka ./flux/infrastructure nie ma
-# wlasnego kustomization.yaml, wiec rekurencyjnie zagarnia wszystkie
-# podkatalogi, ktore maja juz swoje dedykowane Kustomizacje per komponent.
-# Dwaj wlasciciele bija sie o etykiete kustomize.toolkit.fluxcd.io/name,
-# co Tekton Triggers propaguje do poda el-github i powoduje nieskonczona
-# petle rolloutow.
-# UWAGA: prune: false i deletionPolicy: Orphan MUSZA byc zywe w klastrze
-# ZANIM ten blok zostanie usuniety. Skasowanie go przy prune: true
-# odinstalowaloby HelmReleasy w calym klastrze.
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: infrastructure
-  namespace: flux-system
-spec:
-  interval: 1m0s
-  timeout: 2m0s
-  wait: true
-  prune: false
-  deletionPolicy: Orphan
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-  path: ./flux/infrastructure
-  dependsOn:
-    - name: sources
-
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
