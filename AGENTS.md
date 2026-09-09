@@ -45,6 +45,15 @@ Three touchpoints, all required:
 2. HelmRepository in `flux/infrastructure/sources/<name>.yaml` **and** an entry in `sources/kustomization.yaml`
 3. Flux Kustomization block in `flux/cluster/infrastructure.yaml` with correct `dependsOn`
 
+**Step 3 is not optional and fails silently if skipped.** There used to be a catch-all `infrastructure` Kustomization with `path: ./flux/infrastructure` that recursively picked up every subdirectory, so a forgotten block still got deployed. It was removed on 2026-09-09 because that recursion made it a second owner of all 66 objects; the two owners kept overwriting each other's `kustomize.toolkit.fluxcd.io/name` label, and Tekton Triggers propagates that label into the `el-github` pod template — which produced an endless rollout loop (Deployment revision passed 2300).
+
+Since then there is exactly one owner per object, and a component directory without its own Kustomization block is simply never applied. Nothing errors; it just does not exist in the cluster.
+
+Two side effects worth knowing:
+
+- `flux-local test` collects ~37 items, not ~54. The difference was duplicate renderings from the removed Kustomization, not lost coverage.
+- Removing a Kustomization that owns live objects requires `prune: false` **and** `deletionPolicy: Orphan` in a **separate, already-reconciled commit** before deleting its block. Otherwise the finalizer prunes its inventory — which here would have meant `helm uninstall` on 13 HelmReleases. Verify with `kubectl -n flux-system get kustomization <name> -o jsonpath='{.spec.prune}{"|"}{.spec.deletionPolicy}'` before removing anything.
+
 ## Helm patterns
 
 - **Wrapper chart** when an upstream chart needs extra resources (see `authentik/`, `authentik-blueprints/`): local chart at `flux/infrastructure/<app>/chart/` with upstream as dependency in `Chart.yaml`, custom templates alongside; HelmRelease points at `chart: ./flux/infrastructure/<app>/chart` with GitRepository `flux-system` sourceRef and `reconcileStrategy: Revision`.
