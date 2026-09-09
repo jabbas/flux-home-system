@@ -42,7 +42,12 @@ Pipeline jest pobierany w wersji z budowanego commita, więc zmiana pipeline'u i
 | ServiceAccount | `build-homebudget` (namespace `ci`) |
 | Demon BuildKita | `tcp://buildkitd.ci.svc.cluster.local:1234` |
 | Sekret do pushu | `registry-home-push` (typ `dockerconfigjson`, namespace `ci`) |
+| Sekret do klonowania | `github-pat-readonly` (klucz `token`, namespace `ci`) |
 | Rejestr | `registry.home` — TLS z prywatnego `jabbas-ca`, zaufany przez BuildKita i przez węzły |
+
+**Klonowanie prywatnego repo wymaga poświadczeń — i nie dostaniesz ich automatycznie.** Parametr `gitToken` uwierzytelnia wyłącznie **resolver** pobierający ten plik; własny krok klonujący pipeline'u to osobne połączenie. `ServiceAccount build-<repo>` ma podpięty tylko sekret do rejestru, bez sekretu z adnotacją `tekton.dev/git-*`, więc creds-init nie wstrzyknie niczego dla gita.
+
+Krok klonujący musi więc sam sięgnąć po `github-pat-readonly`. **Podawaj token przez `GIT_ASKPASS`, nie przez URL** — token w adresie zdalnym zostaje w `.git/config` na współdzielonym PVC i wypływa w `git remote -v` oraz w logach.
 
 Pipeline musi zadeklarować `params` o powyższych nazwach i workspace `source` — inaczej `TriggerTemplate` nie dopasuje.
 
@@ -106,6 +111,10 @@ Oba obrazy można budować równolegle (`runAfter` na tym samym tasku klonujący
 **Cache warstw BuildKita nie może leżeć na NFS.** Rozpakowywanie warstw robi `lchown`, a NFS z `sec=sys` odrzuca to jako EPERM. Dotyczy wyłącznie wewnętrznego cache'u demona (już rozwiązane po stronie platformy — `emptyDir` na dysku węzła). Workspace ze źródłami na NFS jest w porządku.
 
 **Namespace `ci` ma PSA `enforce: privileged`.** Nie licz na to gdzie indziej; jeśli pipeline miałby kiedyś działać w innym namespace, rootless BuildKit zostanie odrzucony przez `baseline` z powodu `seccompProfile: Unconfined`.
+
+**BuildKit nie widzi `.containerignore`.** Czyta wyłącznie `.dockerignore` albo `<nazwa-pliku>.dockerignore`. Repozytoria budowane lokalnie Podmanem zwykle mają `.containerignore` — wtedy kontekst budowania w CI jest **szerszy niż lokalnie**, cicho, bez błędu. Objawia się dopiero tym, że build wciąga pliki testowe albo `node_modules`. Albo przepisz plik w kroku klonującym, albo trzymaj w repo prawdziwy `.dockerignore`.
+
+**Obrazy bazowe idą prosto z Docker Huba.** `buildkitd` ma skonfigurowane CA tylko dla `registry.home`, nie ma mirrora dla `docker.io` — więc buildy podlegają anonimowym limitom Docker Huba. Nie ugryzło jeszcze, ale to latentna przyczyna losowych awarii; `mirror.gcr.io` jest tańszym obejściem niż debugowanie tego pod presją.
 
 ## Jak przetestować bez czekania na webhooka
 
