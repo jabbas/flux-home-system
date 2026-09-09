@@ -49,6 +49,17 @@ spec:
               value: $(tt.params.revision)
             - name: pathInRepo
               value: .tekton/pipeline.yaml
+            # PAT do prywatnego repozytorium. UWAGA: wartoscia jest NAZWA
+            # sekretu w namespace ci (tam, gdzie powstaje PipelineRun), a nie
+            # sam token. Klucz w sekrecie to domyslnie `token` (gitTokenKey).
+            #
+            # UWAGA NA LITEROWKI: git resolver po cichu ignoruje nieznane
+            # parametry — zla nazwa (np. `gittoken`, `git-token`) nie da
+            # zadnego bledu walidacji, tylko `clone error: authentication
+            # required`, czyli komunikat nie do odroznienia od braku
+            # konfiguracji albo od nieprawidlowego/wygaslego tokenu.
+            - name: gitToken
+              value: github-pat-homebudget
         params:
           - name: repo-url
             value: $(tt.params.repo-url)
