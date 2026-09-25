@@ -5,3 +5,5 @@ resources:
   #- namespace.yaml
   - config-zfs-pve-ssd.yaml
   - release.yaml
+  - config-zfs-pve-iscsi.yaml
+  - release-iscsi.yaml
