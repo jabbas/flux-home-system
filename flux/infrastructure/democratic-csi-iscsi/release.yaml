@@ -1,0 +1,183 @@
+---
+# Second democratic-csi deployment, providing block storage over iSCSI.
+#
+# Deliberately kept in its own Flux Kustomization rather than alongside the NFS
+# deployment. A failing HelmRelease here previously made the democratic-csi
+# Kustomization unhealthy, which blocked cloudnativepg and tekton-ci through
+# dependsOn. Nothing depends on this Kustomization, so storage experiments
+# cannot take production down with them.
+#
+# Rationale for iSCSI at all: the NFS driver cannot provide correct POSIX file
+# locking, which breaks mmap/flock-based embedded databases (LMDB, SQLite in WAL
+# mode). Exposing ZFS zvols as iSCSI LUNs gives pods a real block device with a
+# local ext4 filesystem, where locking behaves normally.
+#
+# Coexistence rules with the NFS deployment:
+#   - csiDriver.name must be unique per cluster    -> org.democratic-csi.iscsi
+#   - the ZFS parent dataset must not overlap      -> rpool/k8s-iscsi (vs rpool/k8s)
+#   - iSCSI asset names are global on the target   -> namePrefix "csi-"
+#
+# Host-side prerequisites on pve.home (already done):
+#   - targetcli-fb, python3-rtslib-fb, python3-configshell-fb installed
+#   - rtslib-fb-targetctl.service enabled and active
+#   - targetcli auto_save_on_exit=true (the driver never calls saveconfig, so
+#     persistence of the LIO config depends entirely on this)
+#   - datasets rpool/k8s-iscsi/v and rpool/k8s-iscsi/s created, compression=lz4
+#   - zfs-import@rpool.service wired into zfs-import.target.wants, so the pool is
+#     imported before LIO restores its config (otherwise every host reboot leaves
+#     all LUNs missing). UNVALIDATED until the host is actually rebooted.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: democratic-csi-iscsi
+  namespace: democratic-system
+spec:
+  chart:
+    spec:
+      chart: democratic-csi
+      version: "0.15.1"
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: democratic-csi
+        namespace: flux-system
+  interval: 1m0s
+  # The node DaemonSet has to pull a ~300 MB image on three nodes before Helm's
+  # readiness wait is satisfied. The chart's default 5m wait timed out on the
+  # first attempt. Retry rather than stalling permanently on a transient issue.
+  install:
+    timeout: 10m0s
+    remediation:
+      retries: 2
+  upgrade:
+    timeout: 10m0s
+    remediation:
+      retries: 2
+  values:
+    csiDriver:
+      # Must differ from org.democratic-csi.nfs used by the other release.
+      name: "org.democratic-csi.iscsi"
+      fsGroupPolicy: ReadWriteOnceWithFSType
+      # iSCSI volumes are RWO and go through a real attach/detach cycle.
+      attachRequired: true
+
+    controller:
+      driver:
+        image:
+          registry: ghcr.io/democratic-csi/democratic-csi
+          # The chart defaults to "latest", which is not reproducible under Flux.
+          tag: "v1.9.5"
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+      externalAttacher:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+      externalProvisioner:
+        extraArgs:
+          - --extra-create-metadata
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+      externalResizer:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+      externalSnapshotter:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+
+    node:
+      # Required so the node plugin can nsenter into the host namespace where
+      # the Talos ext-iscsid extension keeps iscsiadm.
+      hostPID: true
+      driver:
+        image:
+          registry: ghcr.io/democratic-csi/democratic-csi
+          tag: "v1.9.5"
+        # Talos ships iscsiadm only via the iscsi-tools extension, installed to
+        # /usr/local/sbin (the extension is built with -Discsi_sbindir).
+        extraEnv:
+          - name: ISCSIADM_HOST_STRATEGY
+            value: nsenter
+          - name: ISCSIADM_HOST_PATH
+            value: /usr/local/sbin/iscsiadm
+        # iscsiDirHostPath is deliberately left at the chart default (/etc/iscsi).
+        # Do NOT set it to /usr/local/etc/iscsi: that path was removed in
+        # iscsi-tools v0.2.0 and the node pods then fail trying to mkdir it on a
+        # read-only filesystem. Every pre-2025 blog post still recommends it.
+        #
+        # The empty hostPathType below is the actual Talos fix. On Talos the
+        # kubelet runs in its own mount namespace which does not contain
+        # /etc/iscsi, so the default type "Directory" fails its check with
+        # "hostPath type check failed ... path does not exist" and the pods never
+        # start. The mount itself is performed by containerd in the HOST
+        # namespace, so skipping the check still yields the real host directory.
+        # Do not use DirectoryOrCreate: that type explicitly requires kubelet to
+        # resolve the path and would try to create it inside kubelet's own
+        # read-only root. Ref: siderolabs/talos discussion #9674.
+        iscsiDirHostPathType: ""
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+      driverRegistrar:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            memory: 32Mi
+      cleanup:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            memory: 32Mi
+
+    driver:
+      config:
+        # The chart reads this even when existingConfigSecret is set.
+        driver: zfs-generic-iscsi
+      existingConfigSecret: csi-zfs-pve-iscsi
+
+    volumeSnapshotClasses:
+      - name: democratic-csi-iscsi
+        deletionPolicy: Delete
+        parameters: {}
+
+    storageClasses:
+      - name: zfs-iscsi-csi
+        # zfs-nfs-csi stays the cluster default.
+        defaultClass: false
+        reclaimPolicy: Delete
+        # RWO block: do not attach the LUN until the consuming pod is scheduled,
+        # otherwise the volume can be bound to a node that will not run it.
+        volumeBindingMode: WaitForFirstConsumer
+        allowVolumeExpansion: true
+        parameters:
+          # The local filesystem on top of the LUN. This is what restores proper
+          # POSIX locking for LMDB/SQLite workloads.
+          fsType: ext4
+        mountOptions:
+          - noatime
