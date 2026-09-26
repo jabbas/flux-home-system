@@ -105,18 +105,47 @@ spec:
             memory: 128Mi
 
     node:
-      # Required so the node plugin can nsenter into the host namespace where
-      # the Talos ext-iscsid extension keeps iscsiadm.
+      # Not required by the chroot strategy, but harmless and left on for
+      # multipath/IPC paths.
       hostPID: true
       driver:
         image:
           registry: ghcr.io/democratic-csi/democratic-csi
           tag: "v1.9.5"
-        # Talos ships iscsiadm only via the iscsi-tools extension, installed to
-        # /usr/local/sbin (the extension is built with -Discsi_sbindir).
+        # /usr/local/sbin/iscsiadm inside the image is NOT the real binary: it is
+        # a bash wrapper shipped by democratic-csi (docker/iscsiadm) that decides
+        # how to reach the host's iscsiadm. It supports exactly two strategies.
+        #
+        # "nsenter" CANNOT WORK ON TALOS. It resolves the daemon with
+        # `pgrep --exact --oldest iscsid` and then enters that PID's mount and
+        # network namespaces. On Talos v1.14, hostPID: true grants the sandboxd
+        # PID namespace, not the true host one: /proc/1/comm is "sandboxd", only
+        # Kubernetes-side processes are visible, and iscsid - which runs as a
+        # Talos extension service in containerd namespace "system" - is absent.
+        # The process is genuinely named "iscsid", so the pattern is not the
+        # problem and no tuning helps. pgrep matches nothing and the wrapper
+        # aborts with "failed to find iscsid pid for nsenter", failing
+        # NodeStageVolume. Same symptom as democratic-csi#488, which was closed
+        # without a resolution.
+        #
+        # "chroot" does no PID lookup at all: it runs
+        # `chroot /host /usr/local/sbin/iscsiadm`, using the host root that the
+        # chart already mounts at /host. That reaches the real ELF binary and the
+        # host's /etc/iscsi database. It can talk to the daemon because
+        # open-iscsi's control socket is the abstract AF_UNIX socket
+        # @ISCSIADM_ABSTRACT_NAMESPACE, which is scoped to the network namespace
+        # - and hostNetwork is already shared. Verified on all three nodes:
+        # `chroot /host /usr/local/sbin/iscsiadm -m session` returns
+        # "No active sessions" with exit 21, i.e. the daemon answered.
+        #
+        # chroot is also the wrapper's own built-in default.
         extraEnv:
           - name: ISCSIADM_HOST_STRATEGY
-            value: nsenter
+            value: chroot
+          # Absolute path, so the wrapper takes its first branch and execs
+          # /host/usr/local/sbin/iscsiadm directly. Without this it falls through
+          # to `chroot /host /usr/bin/env ...`, which fails on Talos because the
+          # host rootfs has no /usr/bin/env.
           - name: ISCSIADM_HOST_PATH
             value: /usr/local/sbin/iscsiadm
         # iscsiDirHostPath is deliberately left at the chart default (/etc/iscsi).
