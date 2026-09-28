@@ -6,7 +6,15 @@ fullnameOverride: ""
 database:
   instances: 2
   size: 0.5Gi
-  backupSchedule: "0 2 * * 1"
+  # CNPG ScheduledBackup uses a SIX-field cron with a leading seconds field
+  # (robfig/cron), not the five-field Unix/Kubernetes format. A five-field value
+  # does NOT fail validation - it is silently shifted one position, so the
+  # trailing weekday is consumed as the MONTH. This entry previously read
+  # "0 2 * * 1", which the operator parsed as "January", scheduling the next run
+  # for 2027-01-01 and then hourly for all of January. The cluster went 22 days
+  # with a valid-looking backup config and zero backups.
+  # Format: <sec> <min> <hour> <day-of-month> <month> <day-of-week>
+  backupSchedule: "0 0 2 * * 1"  # Mondays 02:00:00
   snapshotClassName: democratic-csi
   resources:
     requests:
