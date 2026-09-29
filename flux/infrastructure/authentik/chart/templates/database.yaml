@@ -20,6 +20,12 @@ spec:
       database: authentik
       owner: authentik
   storage:
+    # CNPG does not reconcile storageClass on existing PVCs - reconcileExistingPVCs
+    # handles only size and volume-attributes-class. This field therefore applies
+    # only to newly created volumes, and each instance must be re-created once
+    # (replica first, then a switchover, then the former primary) for a migration
+    # to take effect.
+    storageClass: {{ .Values.database.storageClass }}
     size: {{ .Values.database.size }}
   backup:
     volumeSnapshot:
