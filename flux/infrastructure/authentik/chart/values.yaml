@@ -5,7 +5,24 @@ fullnameOverride: ""
 # Database configuration
 database:
   instances: 2
-  size: 0.5Gi
+  # Raised from 0.5Gi when the database moved from NFS to iSCSI. On the NFS class
+  # a PVC's size is effectively measured in ZFS-compressed bytes, so 114 MB of
+  # data occupied 66 MB of the 512 MiB quota and df reported 14% used. On ext4
+  # over a zvol the filesystem sees uncompressed size - the same data takes
+  # 137 MB - so the migration silently reduced usable capacity at an unchanged
+  # nominal size. That left 488 MiB of filesystem holding 235 MiB while
+  # max_wal_size is 1024MB and wal_keep_size is 512MB: WAL alone was permitted to
+  # exceed the whole volume, which would halt the primary on a write burst.
+  #
+  # Growing the volume is preferred over shrinking max_wal_size. A smaller WAL
+  # forces more frequent checkpoints and therefore more writes, and the backing
+  # NVMe drives are DRAM-less and already at 45% wear, so write amplification is
+  # the binding constraint on this host.
+  #
+  # The zvols are sparse, so the nominal size costs only what is actually
+  # written. CNPG does reconcile PVC size on existing volumes, so this expands
+  # online without re-creating instances.
+  size: 2Gi
   # Block storage over iSCSI. Measured 15240 random-write IOPS at 4k against 1989
   # on NFS, with p99 latency 13.8ms against 1.08s - the access pattern PostgreSQL
   # generates. The db variant also sets reclaimPolicy Retain, so an accidental or
