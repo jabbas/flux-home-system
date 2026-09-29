@@ -205,8 +205,41 @@ spec:
         volumeBindingMode: WaitForFirstConsumer
         allowVolumeExpansion: true
         parameters:
-          # The local filesystem on top of the LUN. This is what restores proper
-          # POSIX locking for LMDB/SQLite workloads.
+          # The local filesystem on top of the LUN. Note this is NOT what makes
+          # locking work: NFSv4.1 was separately measured to enforce contended
+          # flock() correctly too. The reason to prefer iSCSI is random-write
+          # performance - measured 15240 vs 1989 IOPS at 4k, with p99 latency
+          # 13.8ms vs 1.08s.
           fsType: ext4
         mountOptions:
           - noatime
+
+      # Database-grade variant: Retain plus online discard.
+      #
+      # reclaimPolicy: Retain - deleting a PVC leaves the PV and its zvol
+      # intact. The right trade for a database, at the cost of released volumes
+      # needing manual cleanup. See the equivalent note on zfs-nfs-db.
+      #
+      # discard matters more here than on NFS. The zvols are sparse, and ext4
+      # mounted without discard never returns freed blocks to the pool: a test
+      # volume showed 2.02 GiB still allocated on the zvol while the guest
+      # filesystem reported 0% used. On a pool at 68% capacity that silently
+      # accumulates until a write fails with ENOSPC. The LIO backstore is
+      # already configured with emulate_tpu=1, so the TRIM path exists and was
+      # simply unused.
+      #
+      # Online discard is chosen over a periodic fstrim because there is no
+      # natural place to run fstrim against a volume that lives inside a pod.
+      # The usual objection - that inline discard adds write latency - is weak
+      # for PostgreSQL, which reuses space internally and recycles WAL segments
+      # by renaming rather than deleting, so discard traffic is rare.
+      - name: zfs-iscsi-db
+        defaultClass: false
+        reclaimPolicy: Retain
+        volumeBindingMode: WaitForFirstConsumer
+        allowVolumeExpansion: true
+        parameters:
+          fsType: ext4
+        mountOptions:
+          - noatime
+          - discard

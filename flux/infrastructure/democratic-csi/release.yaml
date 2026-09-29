@@ -108,3 +108,35 @@ spec:
           - noatime
           - nolock
           - nfsvers=4.1
+
+      # Database-grade variant. Identical provisioning to zfs-nfs-csi - same
+      # driver, same parent dataset - and differs only in reclaim policy.
+      #
+      # reclaimPolicy: Retain means deleting a PVC leaves the PV and its ZFS
+      # dataset intact rather than destroying it. That is the right trade for a
+      # database: an accidental or cascading PVC deletion becomes a manual
+      # cleanup task instead of data loss. It is not free - released PVs and
+      # their datasets accumulate and must be reclaimed by hand.
+      #
+      # This exists because the CNPG PVCs were found to be exposed to exactly
+      # that cascade: a Helm uninstall would delete the Cluster CR, the PVCs
+      # follow via controller ownerReference, and the PVs follow via
+      # reclaimPolicy Delete. The live PVs were patched to Retain as an
+      # emergency measure; this class encodes the intent so any PVC recreated
+      # later - a replica rebuild after node failure, for instance - is
+      # protected without another manual patch.
+      #
+      # nolock is deliberately omitted. NFSv4.1 ignores it and negotiates
+      # local_lock=none, sending locks to the server; it was verified that
+      # contended flock() is correctly denied over this mount. Keeping the
+      # option would imply locking is disabled, which is not true.
+      - name: zfs-nfs-db
+        defaultClass: false
+        reclaimPolicy: Retain
+        volumeBindingMode: Immediate
+        allowVolumeExpansion: true
+        parameters:
+          fsType: nfs
+        mountOptions:
+          - noatime
+          - nfsvers=4.1
