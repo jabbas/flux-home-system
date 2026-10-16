@@ -1,0 +1,56 @@
+{{/*
+  Dodajesz nowy proxy provider? Dwie rzeczy poza tym plikiem są obowiązkowe:
+  1. dopisz providera do listy w blueprint-outpost.yaml (attrs.providers
+     NADPISUJE listę — provider spoza niej nie działa w forwardAuth),
+  2. zarejestruj tę ConfigMapę w blueprints.configMaps w
+     flux/infrastructure/authentik/chart/values.yaml — worker montuje
+     wyłącznie blueprinty z tej jawnej listy.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "authentik-blueprints.fullname" . }}-homebudget
+  labels:
+    {{- include "authentik-blueprints.componentLabels" (dict "context" . "component" "homebudget") | nindent 4 }}
+data:
+  homebudget.yaml: |
+    version: 1
+    metadata:
+      name: Homebudget Proxy Setup
+      labels:
+        blueprints.goauthentik.io/instantiate: "true"
+    entries:
+      # Proxy provider for forwardAuth with Traefik. Chroni CAŁOŚĆ aplikacji
+      # (łącznie z /api) — w odróżnieniu od firecrawla, patrz specyfikacja
+      # homebudget "Dostęp z zewnątrz" i decyzja 8 planu wdrożenia.
+      - model: authentik_providers_proxy.proxyprovider
+        id: homebudget-provider
+        identifiers:
+          name: Homebudget Proxy
+        attrs:
+          authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+          invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+          external_host: https://budget.jabbas.eu
+          mode: forward_single
+          access_token_validity: hours=24
+
+      # Application
+      - model: authentik_core.application
+        id: homebudget-app
+        identifiers:
+          slug: homebudget
+        attrs:
+          name: Homebudget
+          icon: {{ .Values.oidc.homebudget.icon | quote }}
+          provider: !Find [authentik_providers_proxy.proxyprovider, [name, "Homebudget Proxy"]]
+
+      # Policy binding for access control
+      - model: authentik_policies.policybinding
+        identifiers:
+          order: 0
+          target: !Find [authentik_core.application, [slug, homebudget]]
+          group: !Find [authentik_core.group, [name, homebudget-users]]
+        attrs:
+          enabled: true
+          negate: false
+          timeout: 30

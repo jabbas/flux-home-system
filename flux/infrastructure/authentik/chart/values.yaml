@@ -133,6 +133,7 @@ authentik:
       - authentik-blueprints-victoria-metrics
       - authentik-blueprints-grafana
       - authentik-blueprints-tekton
+      - authentik-blueprints-homebudget
       # Wspólny blueprint outpostu — musi być zamontowany, inaczej lista
       # providerów embedded outpostu nie jest zarządzana przez GitOps.
       - authentik-blueprints-outpost

@@ -24,6 +24,8 @@ groups:
     superuser: false
   - name: tekton-admins
     superuser: false
+  - name: homebudget-users
+    superuser: false
 
 # Users to create
 users:
@@ -36,6 +38,7 @@ users:
       - authentik Admins
       - monitoring-admins
       - tekton-admins
+      - homebudget-users
 
 # OIDC configuration
 oidc:
@@ -62,6 +65,15 @@ oidc:
 
   tekton:
     icon: https://raw.githubusercontent.com/cncf/artwork/main/projects/tekton/icon/color/tekton-icon-color.svg
+
+  homebudget:
+    # Własna aplikacja tego repozytorium (nie obcy projekt jak pozostałe
+    # wpisy oidc.* wyżej) — favicon serwowany przez nginx (web-deployment.yaml,
+    # Zadanie 11 planu wdrożenia). Kafelek pokaże złamaną ikonę do czasu
+    # pierwszego wdrożenia (Zadanie 15) — ten sam, samo-naprawiający się
+    # porządek co blueprint-outpost.yaml odwołujący się do jeszcze
+    # nieistniejącego providera (patrz AGENTS.md: "It self-heals").
+    icon: https://budget.jabbas.eu/favicon.svg
 
 # RBAC for OIDC users
 clusterAdminUsers:

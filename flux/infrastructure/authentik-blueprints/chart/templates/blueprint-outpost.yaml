@@ -25,3 +25,4 @@ data:
           providers:
             - !Find [authentik_providers_proxy.proxyprovider, [name, "Victoria Metrics Proxy"]]
             - !Find [authentik_providers_proxy.proxyprovider, [name, "Tekton Proxy"]]
+            - !Find [authentik_providers_proxy.proxyprovider, [name, "Homebudget Proxy"]]
