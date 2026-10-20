@@ -14,6 +14,31 @@ spec:
     - name: revision
       value: $(body.after)
 ---
+# Mapowanie payloadu "push" tagu semver (refs/tags/X.Y.Z) na parametry
+# TriggerTemplate release-from-repo. `extensions.version` ustawia nakladka CEL
+# triggera github-tag (nazwa tagu bez `refs/tags/`).
+#
+# DLACZEGO `revision` = NAZWA TAGU, a nie `body.after`: dla tagu adnotowanego
+# (recznego, `git tag -a`) `body.after` to SHA OBIEKTU TAGU, nie commita.
+# Git resolver i krok clone (`git fetch origin "$REVISION"`) dzialaja z nazwa
+# tagu niezaleznie od tego, czy tag jest lekki, czy adnotowany, i zawsze
+# buduja commit, na ktory tag wskazuje.
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: github-tag
+  namespace: ci
+spec:
+  params:
+    - name: repo-url
+      value: $(body.repository.clone_url)
+    - name: repo-name
+      value: $(body.repository.name)
+    - name: revision
+      value: $(extensions.version)
+    - name: version
+      value: $(extensions.version)
+---
 # Szablon PipelineRunu. Sama definicja Pipeline'u NIE jest w tym repo —
 # jest pobierana git resolverem z repozytorium aplikacji (.tekton/pipeline.yaml)
 # z dokladnie tej rewizji, ktora przyszla w webhooku.
@@ -84,6 +109,73 @@ spec:
                   requests:
                     storage: 5Gi
 ---
+# Szablon PipelineRunu WYDANIA (tag semver X.Y.Z). Kopia build-from-repo z
+# roznicami: pipeline pobierany z .tekton/release.yaml (z rewizji = nazwy
+# tagu), dodatkowe params `version` i `chart-repo`, dluzszy timeout.
+# Kontrakt: docs/plans/2026-09-09-tekton-pipeline-contract.md, sekcja
+# "Wydanie (release)".
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: release-from-repo
+  namespace: ci
+spec:
+  params:
+    - name: repo-url
+      description: Adres HTTPS repozytorium (clone_url z payloadu)
+    - name: repo-name
+      description: Nazwa repozytorium — uzywana w nazwie PipelineRunu, SA i obrazu
+    - name: revision
+      description: NAZWA TAGU (refs/tags/X -> X), nigdy body.after
+    - name: version
+      description: Wersja wydania X.Y.Z (= nazwa tagu)
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: release-$(tt.params.repo-name)-
+        namespace: ci
+      spec:
+        # Suma timeoutow taskow .tekton/release.yaml (guard, clone, test,
+        # buildy, publish-chart) przekracza domyslna godzine.
+        timeouts:
+          pipeline: 1h30m
+        taskRunTemplate:
+          serviceAccountName: build-$(tt.params.repo-name)
+        pipelineRef:
+          resolver: git
+          params:
+            - name: url
+              value: $(tt.params.repo-url)
+            - name: revision
+              value: $(tt.params.revision)
+            - name: pathInRepo
+              value: .tekton/release.yaml
+            # Nazwa sekretu w ns ci, nie token — patrz uwagi w build-from-repo.
+            - name: gitToken
+              value: github-pat-readonly
+        params:
+          - name: repo-url
+            value: $(tt.params.repo-url)
+          - name: revision
+            value: $(tt.params.revision)
+          - name: version
+            value: $(tt.params.version)
+          - name: image-prefix
+            value: registry.home/$(tt.params.repo-name)
+          - name: chart-repo
+            value: registry.home/charts
+        workspaces:
+          - name: source
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                storageClassName: zfs-nfs-csi
+                resources:
+                  requests:
+                    storage: 5Gi
+---
 # Publiczny punkt wejscia dla webhooka GitHuba (tekton.jabbas.eu).
 apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
@@ -126,3 +218,39 @@ spec:
         - ref: github-push
       template:
         ref: build-from-repo
+    # Wydanie: push tagu semver X.Y.Z (bez "v", bez prerelease) uruchamia
+    # .tekton/release.yaml z repozytorium aplikacji.
+    - name: github-tag
+      interceptors:
+        # 1) Ta sama weryfikacja HMAC co w github-push.
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: tekton-github-webhook
+                secretKey: secretToken
+            - name: eventTypes
+              value:
+                - push
+        # 2) Allowlista repozytoriow wydawanych + tylko tag X.Y.Z.
+        #    `!body.deleted` odrzuca usuniecie tagu (GitHub wysyla wtedy
+        #    "push" z deleted: true). Nakladka `version` = nazwa tagu.
+        #    Dodanie wydan dla kolejnego repo = wpis w allowliscie ponizej.
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.repository.full_name in ['jabbas/homebudget'] &&
+                body.ref.startsWith('refs/tags/') &&
+                !body.deleted &&
+                body.ref.split('/')[2].matches('^[0-9]+\\.[0-9]+\\.[0-9]+$')
+            - name: overlays
+              value:
+                - key: version
+                  expression: "body.ref.split('/')[2]"
+      bindings:
+        - ref: github-tag
+      template:
+        ref: release-from-repo
