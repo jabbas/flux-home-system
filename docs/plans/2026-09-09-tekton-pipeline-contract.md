@@ -11,16 +11,27 @@ Podział odpowiedzialności jest celowy: `flux-home-system` dostarcza platformę
 
 ## Ścieżka, w którą wpina się pipeline
 
+Jeden webhook (`push`), jeden EventListener `github`, dwie ścieżki rozdzielone filtrem CEL:
+
 ```
-push do main
+push do main / push tagu
   → webhook GitHuba → tekton.jabbas.eu (Cloudflare → tunel → Traefik)
-  → EventListener: weryfikacja HMAC, filtr CEL (allowlista repo + refs/heads/main)
-  → TriggerTemplate tworzy PipelineRun
-  → git resolver pobiera .tekton/pipeline.yaml Z TEGO SAMEGO COMMITA   ← twój plik
-  → pipeline buduje i pushuje do registry.home
+  → EventListener `github`: weryfikacja HMAC, potem filtr CEL per trigger
+     │
+     ├─ trigger github-push: allowlista repo + refs/heads/main            (CI)
+     │    → TriggerTemplate build-from-repo → PipelineRun build-<repo>-*
+     │    → git resolver pobiera .tekton/pipeline.yaml Z TEGO SAMEGO COMMITA   ← twój plik
+     │    → pipeline testuje (i ewentualnie buduje)
+     │
+     └─ trigger github-tag: allowlista repo + tag X.Y.Z, nie usunięcie    (wydanie)
+          → TriggerTemplate release-from-repo → PipelineRun release-<repo>-*
+          → git resolver pobiera .tekton/release.yaml Z TAGU              ← twój plik
+          → pipeline: guard → clone → test → obrazy :X.Y.Z → chart OCI X.Y.Z
 ```
 
-Pipeline jest pobierany w wersji z budowanego commita, więc zmiana pipeline'u i zmiana kodu mogą iść w jednym PR.
+Pipeline jest pobierany w wersji z budowanego commita (albo tagu), więc zmiana pipeline'u i zmiana kodu mogą iść w jednym PR.
+
+Szczegóły ścieżki wydania: sekcja [Wydanie (release)](#wydanie-release).
 
 ## Kontrakt
 
@@ -90,15 +101,76 @@ Podział, o którym łatwo zapomnieć: **poświadczenia płyną z klienta (`buil
 
 ## Specyfika homebudgetu
 
-Trzy fakty ustalone przy analizie repo:
+Stan od planu 2 (automatyczne wydawanie, 2026-10-20):
 
 1. Pliki budowania nazywają się **`Containerfile`**, nie `Dockerfile` → `buildctl` wymaga `--opt filename=Containerfile`.
-2. Repo produkuje **dwa obrazy**:
+2. Repo produkuje **trzy obrazy**, wszystkie trafiają do `registry.home`:
    - `${image-prefix}-api` — kontekst `.` (ten sam obraz obsługuje też workera, inna komenda startowa)
    - `${image-prefix}-web` — kontekst `frontend/`
-3. `docker/storage-init.Containerfile` to narzędzie stosu deweloperskiego z `docker-compose.yml` — **nie idzie do rejestru**.
+   - `${image-prefix}-storage-init` — `docker/storage-init.Containerfile`; używany przez chart (provisioning storage), nie tylko przez stos deweloperski
+3. Podział pipeline'ów:
+   - `.tekton/pipeline.yaml` (`homebudget-ci`, push do `main`) — tylko `clone` + `test`, **nie publikuje obrazów**; parametr `image-prefix` zadeklarowany dla zgodności z `build-from-repo`, nieużywany.
+   - `.tekton/release.yaml` (`homebudget-release`, tag `X.Y.Z`) — trzy buildy równolegle po `test`, potem chart.
+4. Chart `helm/` ma w repo na stałe `version: 0.0.0` / `appVersion: "0.0.0"`; prawdziwą wersję wstrzykuje `helm package --version/--app-version` w pipeline'ie wydania.
 
-Oba obrazy można budować równolegle (`runAfter` na tym samym tasku klonującym).
+## Wydanie (release)
+
+Dodane 2026-10-20 (homebudget, plan 2 „automatyczne wydawanie”). Wydanie wyzwala **wyłącznie** push tagu gita `X.Y.Z` (semver bez „v”, bez prerelease). Tag tworzy job `release` w GitHub Actions repo aplikacji (z conventional commits) albo właściciel ręcznie (np. `1.0.0`).
+
+### Ścieżka
+
+```
+push tagu refs/tags/X.Y.Z
+  → EventListener `github`, trigger github-tag (HMAC + CEL)
+  → TriggerBinding github-tag → TriggerTemplate release-from-repo
+  → PipelineRun release-<repo>-* (SA build-<repo>, timeouts.pipeline 1h30m)
+  → git resolver: .tekton/release.yaml z rewizji = nazwa tagu
+```
+
+### Filtr CEL (`github-tag`)
+
+```
+body.repository.full_name in ['jabbas/homebudget'] &&
+body.ref.startsWith('refs/tags/') &&
+!body.deleted &&
+body.ref.split('/')[2].matches('^[0-9]+\\.[0-9]+\\.[0-9]+$')
+```
+
+Nakładka: `version = body.ref.split('/')[2]`. Odrzucane (zweryfikowane 2026-10-20): usunięcie tagu (`deleted: true` — GitHub wysyła je jako zwykły `push`), tag nie-semver, tag prerelease (`0.0.1-rc.1`), push gałęzi. EventListener odpowiada na odrzucone zdarzenie kodem 202 i **nie loguje go na poziomie `info`** — dowodem jest dostarczenie webhooka i brak PipelineRunu z etykietą `triggers.tekton.dev/trigger=github-tag`.
+
+### Co dostajesz w parametrach
+
+| Parametr | Wartość | Uwagi |
+|---|---|---|
+| `repo-url` | `https://github.com/jabbas/homebudget.git` | z `body.repository.clone_url` |
+| `revision` | **nazwa tagu**, np. `0.2.0` | z nakładki CEL (`refs/tags/X` → `X`), **nigdy `body.after`** — dla tagu adnotowanego `body.after` to SHA obiektu tagu, nie commita. Przy ręcznych testach może być też pełny SHA. |
+| `version` | `X.Y.Z` | ta sama wartość co `revision`; tag obrazów, `version` i `appVersion` charta |
+| `image-prefix` | `registry.home/homebudget` | jak w CI |
+| `chart-repo` | `registry.home/charts` | bez `oci://` i bez nazwy charta → `oci://registry.home/charts/<chart>` |
+
+Workspace `source` (PVC 5Gi, `zfs-nfs-csi`) i SA `build-<repo>` jak w CI. Pipeline musi zadeklarować te params i ten workspace.
+
+### Czego się od pipeline'u wydania oczekuje
+
+- **Guard niezmienności jako pierwszy task.** Anonimowy `HEAD` manifestu charta i wszystkich obrazów dla `version`: 404 wszędzie → dalej; 200 gdziekolwiek → błąd „wersja X już opublikowana”; każdy inny kod (401, 5xx, brak połączenia) → błąd (**fail-closed**). Ponowienie wydania = nowy commit = nowa wersja, nigdy nadpisanie.
+- **Testy przed publikacją.** Buildy obrazów `runAfter: [test]`; task `test` identyczny z tym w `.tekton/pipeline.yaml`.
+- **Chart ostatni.** `helm push` dopiero po wszystkich buildach — opublikowany chart jest punktem zatwierdzenia wydania (Flux reaguje na chart, nie na obrazy).
+- **Tag obrazów = `version`** (`registry.home/<repo>-<obraz>:X.Y.Z`). To **świadomy wyjątek** od zasady „tagowanie pełnym SHA commita” z sekcji wyżej: tag semver też jest niemutowalny (pilnuje tego guard, a konto CI nie ma `delete`).
+- Chart pushowany jako OCI: `helm push … oci://$CHART_REPO --registry-config <config.json z registry-home-push> --ca-file /etc/jabbas-ca/ca.crt`.
+
+### CA dla `helm push`
+
+W przeciwieństwie do `buildctl` (TLS nawiązuje demon, który ma już CA), `helm` i `curl` łączą się z `registry.home` same — potrzebują `jabbas-ca`. Sekret `jabbas-ca` (klucz `ca.crt`) jest odbijany reflectorem z `shared-secrets` do `ci` (oraz `grafana`, `homebudget` — ten ostatni dla `OCIRepository` Fluxa w `flux-homeapps`). Montuj go w taskach `guard` i `publish-chart` pod `/etc/jabbas-ca`.
+
+### Retencja
+
+Tagi semver (`X.Y.Z`, także prerelease) zot trzyma **bez limitu**, a konto `tekton` nie ma prawa `delete` — artefakty wydań (także testowe, np. `0.0.0-test.*` w `charts-test/*`, `test-<repo>-*`) zostają na zawsze, chyba że właściciel usunie je w UI zota.
+
+### Dodanie wydań dla kolejnego repozytorium
+
+1. Repo jest już w CI (allowlista `github-push`, `ServiceAccount build-<repo>`, webhook).
+2. Wpis w allowliście CEL triggera **`github-tag`** w `flux/infrastructure/tekton/ci/eventlistener.yaml` (osobna lista od `github-push`).
+3. `.tekton/release.yaml` w repo aplikacji, zgodny z tabelą params wyżej.
 
 ## Pułapki, każda kosztowała czas
 
@@ -186,7 +258,7 @@ Zakończone runy znikają po **godzinie** (`ttlSecondsAfterFinished: 3600`, hist
 
 Polityka jest po stronie rejestru, nie pipeline'u:
 
-- tagi wyglądające na semver (`v1.2.3`) — **trzymane bez limitu**
+- tagi wyglądające na semver (`v1.2.3`, `1.2.3`, także prerelease) — **trzymane bez limitu**
 - pozostałe, czyli tagi per-commit SHA — **10 ostatnio wypchniętych na repozytorium**
 - manifesty nieotagowane — kasowane
 
