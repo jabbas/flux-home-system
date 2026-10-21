@@ -14,7 +14,26 @@ data:
   # Połączenie TLS do rejestru nawiązuje DEMON (buildkitd), więc CA musi
   # trafić tutaj. Poświadczenia do push idą odwrotną drogą — z klienta
   # (buildctl, przez DOCKER_CONFIG w kroku Tektona).
+  #
+  # GC cache'u: bez tej sekcji BuildKit liczy domyślne progi od rozmiaru
+  # dysku węzła (maxUsedSpace 24GB), czyli 3× więcej niż sizeLimit emptyDir
+  # (8Gi) — przy przepełnieniu kubelet eksmitowałby poda, zamiast BuildKit
+  # sam przyciąć cache. Rootless też używa workera [worker.oci].
+  # Rozmiary parsuje units.RAMInBytes, więc "5GB" = 5 GiB (3 GiB zapasu na
+  # skok w trakcie buildu — GC działa dopiero po buildzie).
+  # minFreeSpace liczy się od dysku węzła (/var): gdy wolnego < 8 GiB, GC
+  # tnie cache aż do reservedSpace — eviction kubeleta zaczyna się ~4.8 GB.
+  # Nieznane klucze są po cichu ignorowane (go-toml bez strict) — sprawdzaj
+  # efekt przez `buildctl debug workers -v` (sekcja GC Policy).
+  # Domyślne 4 reguły (w tym 48h/512MB dla source.local/cachemount/git)
+  # zostają, tylko z poniższymi progami.
   buildkitd.toml: |
+    [worker.oci]
+      gc = true
+      reservedSpace = "1GB"
+      maxUsedSpace = "5GB"
+      minFreeSpace = "8GB"
+
     [registry."registry.home"]
       ca = ["/etc/buildkit-certs/ca.crt"]
 
@@ -43,7 +62,7 @@ spec:
         # Wymusza restart poda po zmianie treści buildkitd.toml — bez tego
         # ConfigMap zaktualizowałby się w locie, ale demon czyta config
         # wyłącznie przy starcie.
-        checksum/config: "registry-home-ca-v1"
+        checksum/config: "registry-home-ca-v1-gc-v1"
     # UWAGA: brak ustawień AppArmor (ani przestarzałej adnotacji
     # container.apparmor.security.beta.kubernetes.io/*, ani appArmorProfile).
     # Węzły Talos nie mają AppArmor wśród aktywnych LSM
