@@ -59,6 +59,9 @@
       ##             - siderolabs/util-linux-tools
       schematic_id: 88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b
       version: 1.14.0
+      ## Pinned so that `talosctl gen config` never picks up the bundled default of a
+      ## newer local talosctl. Bump only after `talosctl upgrade-k8s`.
+      kubernetes_version: 1.37.0
 
       domain_name: home
       cluster_name: k8s

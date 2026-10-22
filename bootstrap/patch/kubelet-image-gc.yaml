@@ -1,0 +1,20 @@
+---
+# Kubelet image garbage collection thresholds.
+#
+# Each node has a single 32 GB EPHEMERAL volume shared by container images, etcd
+# and logs. The kubelet defaults (imageGCHighThresholdPercent 85 / Low 80) start
+# image GC at the same point where the default imagefs.available<15% hard eviction
+# fires, so a CI build (BuildKit pulling base images) pushes the node straight into
+# DiskPressure before GC can free anything. That is how the homebudget 0.2.1
+# release pipeline failed on 2026-10-21. GC at 70% down to 60% leaves ~4.8 GB of
+# headroom below the eviction threshold.
+#
+# WARNING: KubeletConfig.config is an Unstructured field (a raw KubeletConfiguration)
+# and is REPLACED WHOLESALE by a patch, not merged. A second patch touching
+# `config` would silently drop these keys (or this one would drop its keys).
+# Every future kubelet setting must go into THIS document.
+apiVersion: v1alpha1
+kind: KubeletConfig
+config:
+    imageGCHighThresholdPercent: 70
+    imageGCLowThresholdPercent: 60

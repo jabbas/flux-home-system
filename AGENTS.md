@@ -79,9 +79,9 @@ source of truth for what actually gets applied — not the contents of `bootstra
 The directory also holds two files that nothing references: `proxy-ipvs-mode.yaml` (still in
 the legacy `cluster.proxy` format) and `provision-secret.yaml` (+ `.age`, a manifest that
 landed in the wrong directory). They are deliberately left in place; seeing an unmigrated
-file next to the eight live ones does not mean the migration is unfinished.
+file next to the nine live ones does not mean the migration is unfinished.
 
-Four traps that are not visible in the files themselves:
+Five traps that are not visible in the files themselves:
 
 - **`Unstructured` fields are replaced wholesale, not merged.**
   `KubeAuthenticationConfig.configuration` is one, so the `anonymous` block with `/livez`,
@@ -99,6 +99,14 @@ Four traps that are not visible in the files themselves:
   `worker.yaml`. This is moot today: the playbook applies `controlplane.yaml` to all three
   nodes and `worker.yaml` is unused. **If workers are ever added, both `KubeNodeConfig`
   patches have to be scoped to control-plane nodes.**
+- **`KubeletConfig.config` is `Unstructured` too, and `gen config` must pin Kubernetes.**
+  `config` (the raw KubeletConfiguration, image GC thresholds today) is replaced wholesale,
+  so `kubelet-image-gc.yaml` is its single source — every future kubelet setting goes into
+  that document, never into a second patch. And the playbook's `talosctl gen config` passes
+  `--kubernetes-version {{ talos.kubernetes_version }}` (pinned in `site.yaml`): without it a
+  newer local `talosctl` would write its own default and a plain re-run of the playbook would
+  silently upgrade the control plane. Kubernetes upgrades go through `talosctl upgrade-k8s`
+  first, then the pin is bumped.
 
 ## Secrets
 
@@ -126,5 +134,5 @@ Known wrinkle: on a fresh cluster bootstrap `blueprint-outpost.yaml` may apply b
 ## Cluster facts
 
 - Endpoint `https://kube.home:6443`, cluster `k8s`, 3 control-plane nodes `talos1-3` (Proxmox VMIDs 401–403 on `pve.home`).
-- Talos pinned in `bootstrap/site.yaml` (currently 1.14.0; extensions: iscsi-tools, qemu-guest-agent, util-linux-tools). The pin is what a *fresh* bootstrap installs — the live nodes still run 1.13.5.
+- Talos pinned in `bootstrap/site.yaml` (currently 1.14.0; extensions: iscsi-tools, qemu-guest-agent, util-linux-tools). The pin is what a *fresh* bootstrap installs; the live nodes run 1.14.0 too. Kubernetes pinned alongside it (`talos.kubernetes_version`, currently 1.37.0).
 - Ingress classes `traefik-internal` / `traefik-external`; services at `*.dev.home`; OIDC via Authentik (`authentik.dev.home`); storage class `zfs-nfs-csi` via democratic-csi (driver config is a SealedSecret).

@@ -8,9 +8,12 @@
   args:
     creates: "{{ talos.secrets_path }}"
 
+# --kubernetes-version is pinned on purpose: without it talosctl writes its own bundled
+# default, so merely upgrading the local talosctl would make a re-run silently upgrade the
+# control plane. Kubernetes upgrades go through `talosctl upgrade-k8s`, then bump the pin.
 - name: Generate configuration using secrets.yaml
   connection: local
-  ansible.builtin.shell: "talosctl gen config {{ talos.cluster_name }} {{ talos.endpoint }} --with-secrets {{ talos.secrets_path }} --with-examples=false --with-docs=false --install-disk {{ talos.boot_disk }} --install-image factory.talos.dev/metal-installer/{{ talos.schematic_id }}:v{{ talos.version }} --additional-sans {{ groups['all'] | join(',') }} --force"
+  ansible.builtin.shell: "talosctl gen config {{ talos.cluster_name }} {{ talos.endpoint }} --with-secrets {{ talos.secrets_path }} --with-examples=false --with-docs=false --install-disk {{ talos.boot_disk }} --install-image factory.talos.dev/metal-installer/{{ talos.schematic_id }}:v{{ talos.version }} --kubernetes-version {{ talos.kubernetes_version }} --additional-sans {{ groups['all'] | join(',') }} --force"
   changed_when: false
 
 - name: Authentik Pre-Shared Key File check
@@ -65,7 +68,8 @@
       -p @patch/ntp.yaml \
       -p @patch/nameservers.yaml \
       -p @patch/sysctls.yaml \
-      -p @patch/registry-home.yaml
+      -p @patch/registry-home.yaml \
+      -p @patch/kubelet-image-gc.yaml
   loop: "{{ groups['all'] }}"
   changed_when: false
 
