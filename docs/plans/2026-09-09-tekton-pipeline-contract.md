@@ -155,7 +155,7 @@ Workspace `source` (PVC 5Gi, `zfs-nfs-csi`) i SA `build-<repo>` jak w CI. Pipeli
 - **Guard niezmienności jako pierwszy task.** Anonimowy `HEAD` manifestu charta i wszystkich obrazów dla `version`: 404 wszędzie → dalej; 200 gdziekolwiek → błąd „wersja X już opublikowana”; każdy inny kod (401, 5xx, brak połączenia) → błąd (**fail-closed**). Ponowienie wydania = nowy commit = nowa wersja, nigdy nadpisanie.
 - **Testy przed publikacją.** Buildy obrazów `runAfter: [test]`; task `test` identyczny z tym w `.tekton/pipeline.yaml`.
 - **Chart ostatni.** `helm push` dopiero po wszystkich buildach — opublikowany chart jest punktem zatwierdzenia wydania (Flux reaguje na chart, nie na obrazy).
-- **Tag obrazów = `version`** (`registry.home/<repo>-<obraz>:X.Y.Z`). To **świadomy wyjątek** od zasady „tagowanie pełnym SHA commita” z sekcji wyżej: tag semver też jest niemutowalny (pilnuje tego guard, a konto CI nie ma `delete`).
+- **Tag obrazów = `version`** (`registry.home/<repo>-<obraz>:X.Y.Z`). To **świadomy wyjątek** od zasady „tagowanie pełnym SHA commita” z sekcji wyżej: tag semver też jest niemutowalny, ale **niezmienność wymusza wyłącznie guard wydania**. Sam rejestr tego nie gwarantuje: konto CI `tekton` ma `update`, więc mogłoby nadpisać istniejący tag (brak `delete` chroni tylko przed usunięciem, nie przed nadpisaniem).
 - Chart pushowany jako OCI: `helm push … oci://$CHART_REPO --registry-config <config.json z registry-home-push> --ca-file /etc/jabbas-ca/ca.crt`.
 
 ### CA dla `helm push`
