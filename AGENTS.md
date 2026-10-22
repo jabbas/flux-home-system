@@ -74,8 +74,20 @@ patch now carries its own `apiVersion: v1alpha1` + `kind:` (`KubeNodeConfig`,
 touching `UnattendedInstallConfig` wipes `provisioning.diskSelector` even when it does not
 mention it.
 
-**The `-p @patch/…` list in `roles/initialize_talos_configuration/tasks/main.yaml` is the
-source of truth for what actually gets applied — not the contents of `bootstrap/patch/`.**
+**The `initialize_talos_configuration_patches` list in
+`roles/initialize_talos_configuration/tasks/main.yaml` (rendered as `-p @patch/…` in that
+order) is the source of truth for what actually gets applied — not the contents of
+`bootstrap/patch/`.**
+
+Changes to a live cluster go **node by node** through the same playbook, steered by
+extra-vars (documented in `site.yaml`; all unset = historical full run on every node):
+`talos_apply_nodes` (subset of nodes), `talos_apply_mode` (`dry-run` prints each node's
+diff and changes nothing; `try` = `--mode=try`, auto-rollback after
+`talos_apply_try_timeout`, default 5m), `talos_skip_patches` (leave a patch out — the
+rollback path) and `talos_skip_iso_upload` (no Proxmox ISO re-upload; existing VMs only).
+Any of the first three set makes it a maintenance run that skips the talosconfig copy,
+kubeconfig generation and `provision/*.yaml`. Worked example:
+`docs/plans/2026-10-22-kubelet-image-gc.md`.
 The directory also holds two files that nothing references: `proxy-ipvs-mode.yaml` (still in
 the legacy `cluster.proxy` format) and `provision-secret.yaml` (+ `.age`, a manifest that
 landed in the wrong directory). They are deliberately left in place; seeing an unmigrated

@@ -58,20 +58,77 @@
         already_provisioned_nodes: "{{ already_provisioned_nodes | default({}) | combine({ (item.item): (item.item == item.stdout) }) }}"
       loop: "{{ node_versions.results }}"
 
+# THIS LIST IS THE SOURCE OF TRUTH for what gets applied to the nodes (see AGENTS.md
+# "Talos machine config patches"), in this order, as `-p @patch/<name>`.
+#
+# Node-by-node rollout knobs (extra-vars, validated in site.yaml pre_tasks). With all of
+# them unset the run is exactly the historical one: every node, `auto` mode, all patches,
+# followed by the bootstrap-only steps at the end of this file.
+#   talos_apply_nodes        -> talos_apply_nodes_resolved (site.yaml): only these nodes
+#   talos_apply_mode         '' (auto) | dry-run (--dry-run, diff printed) | try (--mode=try)
+#   talos_apply_try_timeout  rollback timeout in try mode, default 5m
+#   talos_skip_patches       patch names from the list below to leave out (rollback)
+# Setting nodes, mode or skip_patches makes this a maintenance run on a live cluster
+# (initialize_talos_configuration_full_run = false): the talosconfig copy,
+# kubeconfig generation and provision/*.yaml are skipped. dry-run additionally skips the
+# etcd bootstrap and the kube-apiserver wait, so it never changes a node.
+- name: Collect the patch list and the rollout options
+  ansible.builtin.set_fact:
+    initialize_talos_configuration_patches:
+      - allow-scheduling.yaml
+      - remove-externallb-label.yaml
+      - oidc.yaml
+      - kube-apiserver-resources.yaml
+      - ntp.yaml
+      - nameservers.yaml
+      - sysctls.yaml
+      - registry-home.yaml
+      - kubelet-image-gc.yaml
+    initialize_talos_configuration_apply_nodes: "{{ talos_apply_nodes_resolved if talos_apply_nodes_resolved | length > 0 else groups['all'] }}"
+    initialize_talos_configuration_apply_flags: >-
+      {{ {'': '',
+          'dry-run': '--dry-run',
+          'try': '--mode=try --timeout ' ~ (talos_apply_try_timeout | default('5m'))}[talos_apply_mode | default('')] }}
+    initialize_talos_configuration_dry_run: "{{ (talos_apply_mode | default('')) == 'dry-run' }}"
+    initialize_talos_configuration_full_run: >-
+      {{ (talos_apply_mode | default('')) == ''
+         and talos_apply_nodes_resolved | length == 0
+         and talos_skip_patches_resolved | length == 0 }}
+
+# Second line of defence after site.yaml pre_tasks: groups['all'] only exists once
+# create_controlpanes has run add_host, and a typo in a patch name must fail instead of
+# silently applying the full list.
+- name: Validate the rollout options against the inventory and the patch list
+  ansible.builtin.assert:
+    that:
+      - initialize_talos_configuration_apply_nodes | length > 0
+      - initialize_talos_configuration_apply_nodes is subset(groups['all'])
+      - talos_skip_patches_resolved is subset(initialize_talos_configuration_patches)
+    fail_msg: >-
+      nodes {{ initialize_talos_configuration_apply_nodes }} must be a subset of {{ groups['all'] }};
+      skipped patches {{ talos_skip_patches_resolved }} must be a subset of {{ initialize_talos_configuration_patches }}
+    quiet: true
+
 - name: Apply patches
-  ansible.builtin.shell: |
-    talosctl --talosconfig talosconfig --nodes {{ item }} apply {{ '--insecure' if not already_provisioned_nodes[item] else '' }} -f controlplane.yaml \
-      -p @patch/allow-scheduling.yaml \
-      -p @patch/remove-externallb-label.yaml \
-      -p @patch/oidc.yaml \
-      -p @patch/kube-apiserver-resources.yaml \
-      -p @patch/ntp.yaml \
-      -p @patch/nameservers.yaml \
-      -p @patch/sysctls.yaml \
-      -p @patch/registry-home.yaml \
-      -p @patch/kubelet-image-gc.yaml
-  loop: "{{ groups['all'] }}"
+  ansible.builtin.shell: >-
+    talosctl --talosconfig talosconfig --nodes {{ item }} apply
+    {{ '--insecure' if not already_provisioned_nodes[item] else '' }}
+    {{ initialize_talos_configuration_apply_flags }}
+    -f controlplane.yaml
+    {% for patch in initialize_talos_configuration_patches if patch not in talos_skip_patches_resolved %}
+    -p @patch/{{ patch }}
+    {% endfor %}
+  register: initialize_talos_configuration_apply
+  loop: "{{ initialize_talos_configuration_apply_nodes }}"
   changed_when: false
+
+- name: Show the dry-run diff per node
+  ansible.builtin.debug:
+    msg: "{{ item.stdout_lines + item.stderr_lines }}"
+  loop: "{{ initialize_talos_configuration_apply.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: initialize_talos_configuration_dry_run | bool
 
 # This is a *transport* gate, nothing more: port 50000 is apid, which answers within
 # seconds of boot and in maintenance mode too, so it says nothing about etcd being
@@ -126,7 +183,14 @@
   failed_when: >-
     initialize_talos_configuration_bootstrap.rc != 0
     and not (initialize_talos_configuration_bootstrap.stderr is search('AlreadyExists|etcd data directory is not empty'))
-  when: not initialize_talos_configuration_bootstrapped | bool
+  when:
+    - not initialize_talos_configuration_dry_run | bool
+    - not initialize_talos_configuration_bootstrapped | bool
+
+# Skipped in dry-run: nothing was applied, so on a not-yet-bootstrapped cluster this would
+# only burn the 10 minute timeout. Everything below it is a bootstrap-only step that a
+# maintenance run (any rollout knob set) does not need; only the local talosconfig
+# endpoint update still runs there, because it touches nothing but bootstrap/talosconfig.
 
 - name: Wait for Talos bootstrap to be completed (kubeapi is ready)
   ansible.builtin.wait_for:
@@ -134,6 +198,7 @@
     port: 6443
   loop: "{{ groups['all'] }}"
   timeout: 600
+  when: not initialize_talos_configuration_dry_run | bool
 
 - name: Update talosconfig with endpoint
   connection: local
@@ -145,6 +210,7 @@
     path: "$HOME/.talos"
     state: directory
     mode: '0750'
+  when: initialize_talos_configuration_full_run | bool
 
 - name: Copy talosconfig to \$HOME/.talos/config
   connection: local
@@ -152,11 +218,13 @@
     src: talosconfig
     dest: "$HOME/.talos/config"
     mode: '0644'
+  when: initialize_talos_configuration_full_run | bool
 
 - name: Generate kubectl config
   connection: local
   ansible.builtin.shell: "talosctl --nodes {{ groups['all'][0] }} --endpoints {{ groups['all'][0] }} kubeconfig"
   changed_when: false
+  when: initialize_talos_configuration_full_run | bool
 
 - name: Provision it with flux
   connection: local
@@ -164,3 +232,4 @@
     state: present
     src: "{{ item }}"
   loop: "{{ lookup('fileglob', playbook_dir + '/provision/*.yaml', wantlist=True) | sort }}"
+  when: initialize_talos_configuration_full_run | bool

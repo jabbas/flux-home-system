@@ -20,7 +20,13 @@
     dest: "./talos-{{ talos.version }}-{{ talos.schematic_id }}-metal-amd64.iso"
     mode: '0644'
     timeout: 100
-  when: not iso_file.stat.exists
+  when:
+    - not iso_file.stat.exists
+    - not (talos_skip_iso_upload | default(false) | bool)
+
+# talos_skip_iso_upload=true is only for maintenance runs against VMs that already exist:
+# they keep the ISO attached from the original upload, and proxmox_kvm below leaves an
+# existing VM untouched. On a fresh bootstrap the VMs need the ISO on Proxmox storage.
 
 - name: Put Talos Linux ISO into proxmox
   community.proxmox.proxmox_template:
@@ -33,6 +39,7 @@
     content_type: iso
     force: true
     src: "./talos-{{ talos.version }}-{{ talos.schematic_id }}-metal-amd64.iso"
+  when: not (talos_skip_iso_upload | default(false) | bool)
 
 - name: Create ControlPane Virtual Machine
   community.proxmox.proxmox_kvm:

@@ -2,6 +2,22 @@
 
 - name: Create Talos ControlPlane on proxmox virtual machine
   hosts: localhost
+  pre_tasks:
+    # Fail before anything touches Proxmox or a node. The role re-checks the node list
+    # against the real inventory and the skipped patches against its patch list.
+    - name: Validate the node-by-node rollout options
+      ansible.builtin.assert:
+        that:
+          - (talos_apply_mode | default('')) in ['', 'dry-run', 'try']
+          - (talos_apply_try_timeout | default('5m')) is match('^([0-9]+(ms|s|m|h))+$')
+          - talos_apply_nodes_resolved is subset(controlpanes | map(attribute='name') | map('regex_replace', '$', '.' ~ talos.domain_name) | list)
+          - talos_skip_patches_resolved is subset(lookup('fileglob', playbook_dir + '/patch/*.yaml', wantlist=True) | map('basename') | list)
+        fail_msg: >-
+          talos_apply_mode must be '', dry-run or try (got '{{ talos_apply_mode | default('') }}');
+          talos_apply_try_timeout must be a Go duration such as 5m (got '{{ talos_apply_try_timeout | default('5m') }}');
+          talos_apply_nodes must name control-plane nodes (got {{ talos_apply_nodes_resolved }});
+          talos_skip_patches must name files in patch/ (got {{ talos_skip_patches_resolved }})
+        quiet: true
   roles:
     - create_controlpanes
     - initialize_talos_configuration
@@ -94,3 +110,23 @@
       - name: talos3
         vmid: 403
         mac: 54:52:00:AA:BB:03
+
+    ## Node-by-node rollout (extra-vars). All unset = the historical run: every node,
+    ## `talosctl apply` in auto mode, all patches, then the bootstrap-only steps.
+    ## Procedure: docs/plans/2026-10-22-kubelet-image-gc.md.
+    ##   talos_apply_nodes        nodes to apply to: list or comma string, `talos1` or `talos1.home`
+    ##   talos_apply_mode         '' (auto) | dry-run (diff printed, nothing changes) | try
+    ##   talos_apply_try_timeout  try-mode rollback timeout (Go duration, default 5m)
+    ##   talos_skip_patches       patch file names to leave out, list or comma string (rollback)
+    ##   talos_skip_iso_upload    true = no ISO fetch/upload to Proxmox (only when the VMs exist)
+    ## nodes, mode or skip_patches set = maintenance run: no talosconfig copy, kubeconfig or
+    ## provision/*.yaml; dry-run also skips the etcd bootstrap and the 6443 wait.
+    talos_apply_nodes_resolved: >-
+      {{ ((talos_apply_nodes | default([])).split(',') if (talos_apply_nodes | default([])) is string
+          else (talos_apply_nodes | default([])))
+         | map('trim') | select
+         | map('regex_replace', '^([^.]+)$', '\1.' ~ talos.domain_name) | list }}
+    talos_skip_patches_resolved: >-
+      {{ ((talos_skip_patches | default([])).split(',') if (talos_skip_patches | default([])) is string
+          else (talos_skip_patches | default([])))
+         | map('trim') | select | list }}
