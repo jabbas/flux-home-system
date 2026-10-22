@@ -16,6 +16,19 @@
   ansible.builtin.shell: "talosctl gen config {{ talos.cluster_name }} {{ talos.endpoint }} --with-secrets {{ talos.secrets_path }} --with-examples=false --with-docs=false --install-disk {{ talos.boot_disk }} --install-image factory.talos.dev/metal-installer/{{ talos.schematic_id }}:v{{ talos.version }} --kubernetes-version {{ talos.kubernetes_version }} --additional-sans {{ groups['all'] | join(',') }} --force"
   changed_when: false
 
+# These four files hold the cluster CA/etcd/service-account keys and the admin client
+# cert. Runs right after generation, so it applies on every run, dry-run included.
+- name: Keep the cluster key files readable by the owner only
+  connection: local
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: '0600'
+  loop:
+    - "{{ talos.secrets_path }}"
+    - controlplane.yaml
+    - worker.yaml
+    - talosconfig
+
 - name: Authentik Pre-Shared Key File check
   connection: local
   ansible.builtin.stat:
@@ -217,13 +230,21 @@
   ansible.builtin.copy:
     src: talosconfig
     dest: "$HOME/.talos/config"
-    mode: '0644'
+    mode: '0600'
   when: initialize_talos_configuration_full_run | bool
 
 - name: Generate kubectl config
   connection: local
   ansible.builtin.shell: "talosctl --nodes {{ groups['all'][0] }} --endpoints {{ groups['all'][0] }} kubeconfig"
   changed_when: false
+  when: initialize_talos_configuration_full_run | bool
+
+# talosctl kubeconfig merges into ~/.kube/config, which holds cluster-admin credentials.
+- name: Keep \$HOME/.kube/config readable by the owner only
+  connection: local
+  ansible.builtin.file:
+    path: "$HOME/.kube/config"
+    mode: '0600'
   when: initialize_talos_configuration_full_run | bool
 
 - name: Provision it with flux
