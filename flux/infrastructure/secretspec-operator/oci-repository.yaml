@@ -1,0 +1,33 @@
+---
+# secretspec-operator chart, published by the release workflow of
+# github.com/jabbas/secretspec-operator (.github/workflows/release.yml) to ghcr.io
+# with version = git tag = image tag. The HelmRelease reads it through chartRef.
+#
+# Anonymous pull (public ghcr.io package) - no secretRef; the registry has a
+# publicly trusted certificate, so no certSecretRef either.
+#
+# The chart is verified with cosign (keyless): only an artifact signed by the
+# release workflow of this repository on a plain semver tag is accepted. The
+# optional `v` in the subject covers the legacy 0.1.0 release, which was
+# tagged `v0.1.0` (ADR 0001 in the secretspec-operator repository,
+# docs/adr/0001-semver-release-tags.md). Newer releases use plain `X.Y.Z` tags.
+#
+# Bumping to 0.2.x or later requires changing the semver range below.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: secretspec-operator
+  namespace: secretspec-system
+spec:
+  interval: 1h
+  url: oci://ghcr.io/jabbas/charts/secretspec-operator
+  ref:
+    semver: ">=0.1.0 <0.2.0"
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  verify:
+    provider: cosign
+    matchOIDCIdentity:
+      - issuer: '^https://token\.actions\.githubusercontent\.com$'
+        subject: '^https://github\.com/jabbas/secretspec-operator/\.github/workflows/release\.yml@refs/tags/v?[0-9]+\.[0-9]+\.[0-9]+$'
