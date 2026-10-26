@@ -14,3 +14,4 @@ resources:
   - authentik.yaml
   - grafana.yaml
   - tekton.yaml
+  - jabbas.yaml

@@ -436,3 +436,23 @@ spec:
   path: ./flux/infrastructure/tekton/dashboard
   dependsOn:
     - name: tekton-config
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: secretspec-operator
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  timeout: 5m0s
+  wait: true
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./flux/infrastructure/secretspec-operator
+  dependsOn:
+    - name: sources
+    # ServiceMonitor CRD (prometheus-operator-crds) and the vmagent converter
+    - name: victoria-metrics

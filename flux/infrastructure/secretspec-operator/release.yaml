@@ -1,0 +1,48 @@
+---
+# Flux does not verify signatures for HTTP Helm repositories. The chart tgz
+# served from the `jabbas` HelmRepository is byte-identical to the cosign-signed
+# OCI chart ghcr.io/jabbas/charts/secretspec-operator; the verification recipe
+# is in docs/installation.md in the secretspec-operator repository.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: secretspec-operator
+  namespace: secretspec-system
+spec:
+  interval: 30m
+  releaseName: secretspec-operator
+
+  install:
+    remediation:
+      retries: 3
+
+  upgrade:
+    remediation:
+      retries: 3
+
+  chart:
+    spec:
+      chart: secretspec-operator
+      version: "0.1.0"
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: HelmRepository
+        name: jabbas
+        namespace: flux-system
+
+  values:
+    # Cluster mode: watch SecretSpecs in all namespaces (ClusterRole).
+    watchNamespaces: []
+
+    crds:
+      # Chart renders the SecretSpec CRD ...
+      install: true
+      # ... and keeps it (with every SecretSpec) on uninstall.
+      keep: true
+
+    # Scraped by vmagent: the VictoriaMetrics operator converts ServiceMonitors
+    # (prometheus converter enabled, vmagent selectAllByDefault) - no selector
+    # labels needed. The CRD comes from prometheus-operator-crds in the
+    # victoria-metrics Kustomization, hence dependsOn there.
+    serviceMonitor:
+      enabled: true
