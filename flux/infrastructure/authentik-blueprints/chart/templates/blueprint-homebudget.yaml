@@ -1,10 +1,11 @@
 {{/*
-  Dodajesz nowy proxy provider? Dwie rzeczy poza tym plikiem są obowiązkowe:
-  1. dopisz providera do listy w blueprint-outpost.yaml (attrs.providers
-     NADPISUJE listę — provider spoza niej nie działa w forwardAuth),
-  2. zarejestruj tę ConfigMapę w blueprints.configMaps w
-     flux/infrastructure/authentik/chart/values.yaml — worker montuje
-     wyłącznie blueprinty z tej jawnej listy.
+  Ten plik istnieje WYŁĄCZNIE po to, żeby usunąć obiekty homebudget z
+  Authentika (state: absent) — homebudget ma już własne logowanie i nie
+  stoi za forwardAuth. Samo usunięcie pliku blueprintu NIE kasuje obiektów,
+  które wcześniej utworzył (dokumentacja Authentika), dlatego sprzątanie
+  idzie dwoma commitami: ten zamienia wpisy na state: absent, a następny —
+  po sprawdzeniu w klastrze, że obiektów już nie ma — usuwa ten plik i jego
+  wpis w blueprints.configMaps w flux/infrastructure/authentik/chart/values.yaml.
 */}}
 apiVersion: v1
 kind: ConfigMap
@@ -20,37 +21,20 @@ data:
       labels:
         blueprints.goauthentik.io/instantiate: "true"
     entries:
-      # Proxy provider for forwardAuth with Traefik. Chroni CAŁOŚĆ aplikacji
-      # (łącznie z /api) — w odróżnieniu od firecrawla, patrz specyfikacja
-      # homebudget "Dostęp z zewnątrz" i decyzja 8 planu wdrożenia.
-      - model: authentik_providers_proxy.proxyprovider
-        id: homebudget-provider
-        identifiers:
-          name: Homebudget Proxy
-        attrs:
-          authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
-          invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
-          external_host: https://budget.jabbas.eu
-          mode: forward_single
-          access_token_validity: hours=24
-
-      # Application
+      # Aplikacja — usunięcie kaskadowo kasuje jej powiązanie z grupą.
       - model: authentik_core.application
-        id: homebudget-app
+        state: absent
         identifiers:
           slug: homebudget
-        attrs:
-          name: Homebudget
-          icon: {{ .Values.oidc.homebudget.icon | quote }}
-          provider: !Find [authentik_providers_proxy.proxyprovider, [name, "Homebudget Proxy"]]
 
-      # Policy binding for access control
-      - model: authentik_policies.policybinding
+      # Proxy provider forwardAuth (wypisany też z blueprint-outpost.yaml).
+      - model: authentik_providers_proxy.proxyprovider
+        state: absent
         identifiers:
-          order: 0
-          target: !Find [authentik_core.application, [slug, homebudget]]
-          group: !Find [authentik_core.group, [name, homebudget-users]]
-        attrs:
-          enabled: true
-          negate: false
-          timeout: 30
+          name: Homebudget Proxy
+
+      # Grupa dostępu (usunięta też z values.groups i z użytkownika jabbas).
+      - model: authentik_core.group
+        state: absent
+        identifiers:
+          name: homebudget-users
