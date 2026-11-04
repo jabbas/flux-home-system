@@ -147,5 +147,6 @@ Known wrinkle: on a fresh cluster bootstrap `blueprint-outpost.yaml` may apply b
 ## Cluster facts
 
 - Endpoint `https://kube.home:6443`, cluster `k8s`, 3 control-plane nodes `talos1-3` (Proxmox VMIDs 401–403 on `pve.home`).
+- **Talos VMs are excluded from the nightly Proxmox backup** (vzdump job `backup-feae205d-89fb`, `exclude 202,300,401,402,403`) — the snapshot-mode backup stalled etcd every night (`docs/plans/2026-11-04-etcd-niestabilnosc-zgloszenie.md`). **Any new Talos node VMID must be added to that list by hand**: `exclude` is a plain VMID list, ranges are rejected. A node is rebuilt by the playbook, not restored from a VM backup.
 - Talos pinned in `bootstrap/site.yaml` (currently 1.14.0; extensions: iscsi-tools, qemu-guest-agent, util-linux-tools). The pin is what a *fresh* bootstrap installs; the live nodes run 1.14.0 too. Kubernetes pinned alongside it (`talos.kubernetes_version`, currently 1.37.0).
 - Ingress classes `traefik-internal` / `traefik-external`; services at `*.dev.home`; OIDC via Authentik (`authentik.dev.home`); storage class `zfs-nfs-csi` via democratic-csi (driver config is a SealedSecret).
