@@ -26,8 +26,12 @@
 # Mapowanie `task-statuses` (lista rozdzielona spacjami) -> stan GitHuba:
 #   dokladnie `Started`        -> pending
 #   wszystkie `Succeeded`      -> success
-#   ktorykolwiek `Failed`      -> failure
-#   cokolwiek innego / pusto   -> error   (None = pominiety / anulowany / timeout)
+#   ktorykolwiek `Failed`      -> failure (tez TaskRun anulowany / po timeoucie —
+#                                          status taska to wtedy Failed)
+#   cokolwiek innego / pusto   -> error   (None = task pominiety)
+#
+# Status pojedynczego taska (tasks.NAZWA.status) ma tylko trzy wartosci:
+# Succeeded, Failed, None.
 #
 # Kontrakt: docs/plans/2026-09-09-tekton-pipeline-contract.md, sekcja
 # "Status commita na GitHubie".
@@ -149,6 +153,8 @@ spec:
         printf 'Authorization: Bearer %s\n' "$TOKEN" > /tmp/authorization-header
         unset TOKEN GITHUB_TOKEN
 
+        # JSON skladany recznie, bez escapowania: STATE pochodzi z listy wyzej,
+        # a DESCRIPTION/STATUS_CONTEXT/TARGET_URL NIE moga zawierac `"` ani `\`.
         BODY=$(printf '{"state":"%s","target_url":"%s","description":"%s","context":"%s"}' \
           "$STATE" "$TARGET_URL" "$DESCRIPTION" "$STATUS_CONTEXT")
 

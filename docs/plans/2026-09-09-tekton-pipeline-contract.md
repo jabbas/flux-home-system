@@ -78,7 +78,7 @@ Pipeline musi zadeklarować `params` o powyższych nazwach i workspace `source` 
 Dodane 2026-11-05. Platforma daje Task `github-commit-status` (`flux/infrastructure/tekton/ci/github-commit-status.yaml`), który ustawia status commita z linkiem do PipelineRunu w dashboardzie (`https://tekton.dev.home`, tylko z sieci domowej). Pipeline wywołuje go dwa razy:
 
 - na początku, bez `runAfter`, z `task-statuses: Started` → `pending`;
-- w `finally` z `task-statuses` = rozdzielone spacjami statusy tasków decydujących o wyniku (np. `$(tasks.clone.status) $(tasks.test.status)`) → `success` (wszystkie Succeeded), `failure` (którykolwiek Failed), `error` (cokolwiek innego — pominięcie, anulowanie, timeout).
+- w `finally` z `task-statuses` = rozdzielone spacjami statusy tasków decydujących o wyniku (np. `$(tasks.clone.status) $(tasks.test.status)`) → `success` (wszystkie Succeeded), `failure` (którykolwiek Failed — także TaskRun anulowany albo po timeoucie, bo Tekton raportuje go jako Failed), `error` (cokolwiek innego — None, czyli task pominięty — albo pusta lista). Status pojedynczego taska ma tylko wartości Succeeded, Failed, None.
 
 Oba wywołania z **`onError: continue`** na PipelineTasku, a w `task-statuses` **nie** `$(tasks.status)` — ten agreguje też `report-start`. Raportowanie nie może ani zatrzymać testów, ani zmienić wyniku PipelineRunu, ani zafałszować zgłaszanego stanu.
 

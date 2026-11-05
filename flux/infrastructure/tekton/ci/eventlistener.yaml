@@ -257,10 +257,23 @@ spec:
         # OBOWIAZKOWY: PR z forka wykonalby dowolny kod z
         # .tekton/pipeline.yaml (pobierany git resolverem z rewizji
         # atakujacego) na koncie build-<repo> z poswiadczeniami do pushu do
-        # registry.home i tokenami GitHuba. Galaz w tym samym repo moze
-        # wypchnac tylko ktos z prawem zapisu, czyli ktos, kto i tak moze
-        # zmienic main. Dla PR-a z usunietego forka head.repo jest null —
-        # wyrazenie konczy sie bledem CEL, czyli trigger NIE odpala.
+        # registry.home i tokenami GitHuba. Dla PR-a z usunietego forka
+        # head.repo jest null — wyrazenie konczy sie bledem CEL, czyli
+        # trigger NIE odpala.
+        #
+        # GRANICA ZAUFANIA (swiadomie zaakceptowana): nawet bez forkow
+        # pipeline PR-a biegnie z NIEZRECENZOWANEJ galezi — kazdy, kto moze
+        # wypchnac galaz do repo, uruchamia w ns ci dowolny kod, zanim
+        # ktokolwiek przeczyta PR. Pod w ns ci moze podpiac KAZDY sekret z
+        # tego namespace'u (RBAC konta nie ogranicza montowania sekretow),
+        # m.in. registry-home-push, jabbas-ca, github-pat-readonly,
+        # github-status-token. To jest do przyjecia tylko dla prywatnego
+        # repo z jednym wlascicielem. Pisze tez aplikacja Renovate: jej
+        # galezie moga zmieniac .tekton/pipeline.yaml (renovate.json
+        # homebudgetu wlacza manager `tekton`). Gdy pojawi sie kolejna osoba
+        # albo bot z prawem zapisu — wrocic do tej decyzji (np. osobny
+        # namespace bez sekretow publikacji dla PR-ow albo uruchamianie
+        # dopiero po etykiecie od wlasciciela).
         - ref:
             name: cel
           params:
