@@ -77,12 +77,14 @@ Pipeline musi zadeklarować `params` o powyższych nazwach i workspace `source` 
 
 Dodane 2026-11-05. Platforma daje Task `github-commit-status` (`flux/infrastructure/tekton/ci/github-commit-status.yaml`), który ustawia status commita z linkiem do PipelineRunu w dashboardzie (`https://tekton.dev.home`, tylko z sieci domowej). Pipeline wywołuje go dwa razy:
 
-- na początku, bez `runAfter`, z `pipeline-status: Started` → `pending`;
-- w `finally` z `pipeline-status: $(tasks.status)` → `success` (Succeeded/Completed), `failure` (Failed), `error` (None — anulowanie, timeout).
+- na początku, bez `runAfter`, z `task-statuses: Started` → `pending`;
+- w `finally` z `task-statuses` = rozdzielone spacjami statusy tasków decydujących o wyniku (np. `$(tasks.clone.status) $(tasks.test.status)`) → `success` (wszystkie Succeeded), `failure` (którykolwiek Failed), `error` (cokolwiek innego — pominięcie, anulowanie, timeout).
+
+Oba wywołania z **`onError: continue`** na PipelineTasku, a w `task-statuses` **nie** `$(tasks.status)` — ten agreguje też `report-start`. Raportowanie nie może ani zatrzymać testów, ani zmienić wyniku PipelineRunu, ani zafałszować zgłaszanego stanu.
 
 Pozostałe params: `repo-url`, `revision` (pełny SHA — statusy nie przyjmują nazw tagów, dlatego `.tekton/release.yaml` statusów nie ustawia), `pipeline-run` (`$(context.pipelineRun.name)`), `status-context` (np. `tekton/homebudget-ci`).
 
-**Problem z GitHubem nie przerywa pipeline'u** (sieć, 5xx, zły token → ostrzeżenie w logu, exit 0). Brak sekretu `github-status-token` przerywa — pod nie wystartuje — bo to błąd konfiguracji platformy.
+**Problem z GitHubem nie przerywa pipeline'u** (sieć, 5xx, zły token → ostrzeżenie w logu, exit 0). Brak sekretu `github-status-token` daje czerwony TaskRun raportowania (pod nie wystartuje), ale dzięki `onError: continue` nie zmienia wyniku PipelineRunu.
 
 Sekret `github-status-token` (klucz `token`) to fine-grained PAT z uprawnieniem **Commit statuses: Read and write**, ograniczony do wybranych repozytoriów (na start: `jabbas/homebudget`). Kolejne repo = dopisanie go do listy repozytoriów tego samego PAT-a na GitHubie, bez nowego sekretu.
 

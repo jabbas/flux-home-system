@@ -8,18 +8,26 @@
 #
 #   tasks:                                   # na poczatku, rownolegle z clone
 #     - name: report-start
+#       onError: continue
 #       taskRef: {name: github-commit-status}
-#       params: [..., {name: pipeline-status, value: Started}]
+#       params: [..., {name: task-statuses, value: Started}]
 #   finally:                                 # zawsze, takze po porazce
 #     - name: report-result
+#       onError: continue
 #       taskRef: {name: github-commit-status}
-#       params: [..., {name: pipeline-status, value: $(tasks.status)}]
+#       params: [..., {name: task-statuses,
+#                      value: "$(tasks.test.status) $(tasks.lint.status)"}]
 #
-# Mapowanie `pipeline-status` -> stan GitHuba:
-#   Started              -> pending
-#   Succeeded, Completed -> success   (Completed = sukces z pominietymi taskami)
-#   Failed               -> failure
-#   cokolwiek innego     -> error     (None = anulowany / timeout / nieznany)
+# `onError: continue` po stronie pipeline'u: raportowanie nie moze bramkowac
+# ani zmieniac wyniku testow. Z tego samego powodu `task-statuses` to
+# statusy WYBRANYCH taskow (tych, ktore decyduja o wyniku), a nie
+# `$(tasks.status)` — ten agreguje tez report-start.
+#
+# Mapowanie `task-statuses` (lista rozdzielona spacjami) -> stan GitHuba:
+#   dokladnie `Started`        -> pending
+#   wszystkie `Succeeded`      -> success
+#   ktorykolwiek `Failed`      -> failure
+#   cokolwiek innego / pusto   -> error   (None = pominiety / anulowany / timeout)
 #
 # Kontrakt: docs/plans/2026-09-09-tekton-pipeline-contract.md, sekcja
 # "Status commita na GitHubie".
@@ -40,9 +48,11 @@ spec:
     - name: revision
       type: string
       description: Pelny SHA commita (40 znakow hex). Statusy GitHuba nie przyjmuja nazw galezi ani tagow.
-    - name: pipeline-status
+    - name: task-statuses
       type: string
-      description: "`Started` na poczatku pipeline'u albo zagregowany status taskow (tasks.status) w finally."
+      description: >-
+        `Started` na poczatku pipeline'u albo, w finally, rozdzielone spacjami
+        statusy taskow decydujacych o wyniku (tasks.NAZWA.status).
     - name: pipeline-run
       type: string
       description: Nazwa PipelineRunu (context.pipelineRun.name) — do linku w dashboardzie.
@@ -61,8 +71,8 @@ spec:
           value: $(params.repo-url)
         - name: REVISION
           value: $(params.revision)
-        - name: PIPELINE_STATUS
-          value: $(params.pipeline-status)
+        - name: TASK_STATUSES
+          value: $(params.task-statuses)
         - name: STATUS_CONTEXT
           value: $(params.status-context)
         # Link do PipelineRunu w dashboardzie (Ingress `tekton-dashboard` w
@@ -73,8 +83,9 @@ spec:
           value: https://tekton.dev.home/#/namespaces/$(context.taskRun.namespace)/pipelineruns/$(params.pipeline-run)
         # Fine-grained PAT: tylko repo homebudget, uprawnienie "Commit
         # statuses: Read and write". Brak sekretu = pod nie wystartuje
-        # (CreateContainerConfigError) i pipeline padnie glosno — to blad
-        # konfiguracji platformy, a nie chwilowa niedostepnosc GitHuba.
+        # (CreateContainerConfigError) i TaskRun jest czerwony — widoczny
+        # blad konfiguracji platformy. Wyniku PipelineRunu to nie zmienia
+        # (pipeline wola ten Task z `onError: continue`).
         - name: GITHUB_TOKEN
           valueFrom:
             secretKeyRef:
@@ -100,12 +111,23 @@ spec:
           exit 0
         }
 
-        case "$PIPELINE_STATUS" in
-          Started)             STATE=pending; DESCRIPTION="Testy w toku" ;;
-          Succeeded|Completed) STATE=success; DESCRIPTION="Testy przeszły" ;;
-          Failed)              STATE=failure; DESCRIPTION="Testy nie przeszły" ;;
-          *)                   STATE=error;   DESCRIPTION="Pipeline przerwany (status: $PIPELINE_STATUS)" ;;
-        esac
+        # Jeden status na linie, bez pustych linii.
+        STATUS_LINES=$(echo "$TASK_STATUSES" | tr -s ' ' '\n' | grep -v '^$')
+        NOT_SUCCEEDED=$(echo "$STATUS_LINES" | grep -vx Succeeded)
+
+        # Kolejnosc ma znaczenie: Failed wygrywa z None (np. clone Failed,
+        # a testy pominiete = None -> to jest porazka, nie przerwanie).
+        if [ "$STATUS_LINES" = "Started" ]; then
+          STATE=pending; DESCRIPTION="Testy w toku"
+        elif [ -z "$STATUS_LINES" ]; then
+          STATE=error;   DESCRIPTION="Brak statusow taskow"
+        elif echo "$STATUS_LINES" | grep -qx Failed; then
+          STATE=failure; DESCRIPTION="Testy nie przeszły"
+        elif [ -z "$NOT_SUCCEEDED" ]; then
+          STATE=success; DESCRIPTION="Testy przeszły"
+        else
+          STATE=error;   DESCRIPTION="Pipeline przerwany (statusy: $TASK_STATUSES)"
+        fi
 
         if ! echo "$REVISION" | grep -Eq '^[0-9a-f]{40}$'; then
           warn "revision '$REVISION' to nie pelny SHA commita"
