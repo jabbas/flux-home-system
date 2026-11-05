@@ -6,5 +6,6 @@ resources:
   - buildkit.yaml
   - secrets.yaml
   - rbac.yaml
+  - github-commit-status.yaml
   - eventlistener.yaml
   - ingress.yaml

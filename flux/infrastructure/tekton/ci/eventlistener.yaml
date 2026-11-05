@@ -39,6 +39,25 @@ spec:
     - name: version
       value: $(extensions.version)
 ---
+# Mapowanie payloadu "pull_request" na parametry TriggerTemplate
+# build-from-repo — ten sam PipelineRun CI co dla pushu na main, tylko
+# `revision` = SHA glowy PR-a. Git resolver pobiera .tekton/pipeline.yaml
+# z tego SHA (galaz PR-a jest w tym samym repo — fork odrzuca filtr CEL),
+# a krok clone pobiera ten sam SHA (`git fetch --depth 1 origin <sha>`).
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: github-pull-request
+  namespace: ci
+spec:
+  params:
+    - name: repo-url
+      value: $(body.repository.clone_url)
+    - name: repo-name
+      value: $(body.repository.name)
+    - name: revision
+      value: $(body.pull_request.head.sha)
+---
 # Szablon PipelineRunu. Sama definicja Pipeline'u NIE jest w tym repo —
 # jest pobierana git resolverem z repozytorium aplikacji (.tekton/pipeline.yaml)
 # z dokladnie tej rewizji, ktora przyszla w webhooku.
@@ -201,12 +220,8 @@ spec:
                 - push
         # 2) Allowlista repozytoriow + tylko galaz main.
         #
-        # UWAGA BEZPIECZENSTWA: jesli kiedykolwiek dodasz tu trigger na
-        # `pull_request`, filtr CEL MUSI dodatkowo sprawdzac
-        #   body.pull_request.head.repo.full_name == body.repository.full_name
-        # W przeciwnym razie PR z forka wykona dowolny kod z .tekton/pipeline.yaml
-        # (pobierany git resolverem z rewizji atakujacego) na koncie z
-        # poswiadczeniami do pushowania obrazow do registry.home.
+        # Pull requesty obsluguje osobny trigger github-pull-request nizej
+        # (z obowiazkowym odrzuceniem forkow).
         - ref:
             name: cel
           params:
@@ -216,6 +231,46 @@ spec:
                 body.ref == 'refs/heads/main'
       bindings:
         - ref: github-push
+      template:
+        ref: build-from-repo
+    # CI dla pull requestow: otwarcie, nowy commit w PR-ze, ponowne otwarcie.
+    # Ten sam pipeline co push na main (.tekton/pipeline.yaml z SHA glowy
+    # PR-a); wynik wraca na PR jako status commita `tekton/<pipeline>`
+    # (Task github-commit-status). Webhook repo musi wysylac zdarzenia
+    # `pull_request` (obok `push`).
+    - name: github-pull-request
+      interceptors:
+        # 1) Ta sama weryfikacja HMAC co w github-push.
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: tekton-github-webhook
+                secretKey: secretToken
+            - name: eventTypes
+              value:
+                - pull_request
+        # 2) Allowlista repozytoriow + akcje, ktore zmieniaja testowany kod.
+        #
+        # UWAGA BEZPIECZENSTWA — warunek head.repo == repository jest
+        # OBOWIAZKOWY: PR z forka wykonalby dowolny kod z
+        # .tekton/pipeline.yaml (pobierany git resolverem z rewizji
+        # atakujacego) na koncie build-<repo> z poswiadczeniami do pushu do
+        # registry.home i tokenami GitHuba. Galaz w tym samym repo moze
+        # wypchnac tylko ktos z prawem zapisu, czyli ktos, kto i tak moze
+        # zmienic main. Dla PR-a z usunietego forka head.repo jest null —
+        # wyrazenie konczy sie bledem CEL, czyli trigger NIE odpala.
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.repository.full_name in ['jabbas/homebudget'] &&
+                body.action in ['opened', 'synchronize', 'reopened'] &&
+                body.pull_request.head.repo.full_name == body.repository.full_name
+      bindings:
+        - ref: github-pull-request
       template:
         ref: build-from-repo
     # Wydanie: push tagu semver X.Y.Z (bez "v", bez prerelease) uruchamia

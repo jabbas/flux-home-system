@@ -11,10 +11,10 @@ Podział odpowiedzialności jest celowy: `flux-home-system` dostarcza platformę
 
 ## Ścieżka, w którą wpina się pipeline
 
-Jeden webhook (`push`), jeden EventListener `github`, dwie ścieżki rozdzielone filtrem CEL:
+Jeden webhook (`push` + `pull_request`), jeden EventListener `github`, trzy ścieżki rozdzielone filtrem CEL:
 
 ```
-push do main / push tagu
+push do main / pull request / push tagu
   → webhook GitHuba → tekton.jabbas.eu (Cloudflare → tunel → Traefik)
   → EventListener `github`: weryfikacja HMAC, potem filtr CEL per trigger
      │
@@ -22,6 +22,11 @@ push do main / push tagu
      │    → TriggerTemplate build-from-repo → PipelineRun build-<repo>-*
      │    → git resolver pobiera .tekton/pipeline.yaml Z TEGO SAMEGO COMMITA   ← twój plik
      │    → pipeline testuje (i ewentualnie buduje)
+     │
+     ├─ trigger github-pull-request: allowlista repo + opened/synchronize/   (CI PR-a)
+     │    reopened + gałąź z TEGO SAMEGO repo (fork → odrzucony)
+     │    → TriggerTemplate build-from-repo, revision = SHA głowy PR-a
+     │    → ten sam .tekton/pipeline.yaml, z SHA głowy PR-a
      │
      └─ trigger github-tag: allowlista repo + tag X.Y.Z, nie usunięcie    (wydanie)
           → TriggerTemplate release-from-repo → PipelineRun release-<repo>-*
@@ -40,7 +45,7 @@ Szczegóły ścieżki wydania: sekcja [Wydanie (release)](#wydanie-release).
 | Parametr | Wartość | Uwagi |
 |---|---|---|
 | `repo-url` | `https://github.com/jabbas/homebudget.git` | z `body.repository.clone_url` |
-| `revision` | pełny SHA commita | z `body.after` |
+| `revision` | pełny SHA commita | z `body.after` (push) albo `body.pull_request.head.sha` (PR) |
 | `image-prefix` | `registry.home/homebudget` | prefiks, **nie** pełna nazwa obrazu |
 
 `image-prefix` jest prefiksem świadomie: platforma nie wie, ile obrazów produkuje repo. Nazewnictwo konkretnych obrazów należy do pipeline'u.
@@ -54,6 +59,7 @@ Szczegóły ścieżki wydania: sekcja [Wydanie (release)](#wydanie-release).
 | Demon BuildKita | `tcp://buildkitd.ci.svc.cluster.local:1234` |
 | Sekret do pushu | `registry-home-push` (typ `dockerconfigjson`, namespace `ci`) |
 | Sekret do klonowania | `github-pat-readonly` (klucz `token`, namespace `ci`) |
+| Task statusu commita | `github-commit-status` (namespace `ci`, sekret `github-status-token`) — patrz [Status commita na GitHubie](#status-commita-na-githubie) |
 | Rejestr | `registry.home` — TLS z prywatnego `jabbas-ca`, zaufany przez BuildKita i przez węzły |
 
 **Klonowanie prywatnego repo wymaga poświadczeń — i nie dostaniesz ich automatycznie.** Parametr `gitToken` uwierzytelnia wyłącznie **resolver** pobierający ten plik; własny krok klonujący pipeline'u to osobne połączenie. `ServiceAccount build-<repo>` ma podpięty tylko sekret do rejestru, bez sekretu z adnotacją `tekton.dev/git-*`, więc creds-init nie wstrzyknie niczego dla gita.
@@ -66,6 +72,21 @@ Pipeline musi zadeklarować `params` o powyższych nazwach i workspace `source` 
 
 - Tagowanie **pełnym SHA commita**, nigdy `latest`. Tagi niemutowalne są warunkiem sensownego rollbacku i przyszłej automatyki Fluxa.
 - Push wyłącznie do `registry.home`. Konto CI **nie ma prawa kasowania** — pipeline nie posprząta po sobie i nie powinien próbować.
+
+## Status commita na GitHubie
+
+Dodane 2026-11-05. Platforma daje Task `github-commit-status` (`flux/infrastructure/tekton/ci/github-commit-status.yaml`), który ustawia status commita z linkiem do PipelineRunu w dashboardzie (`https://tekton.dev.home`, tylko z sieci domowej). Pipeline wywołuje go dwa razy:
+
+- na początku, bez `runAfter`, z `pipeline-status: Started` → `pending`;
+- w `finally` z `pipeline-status: $(tasks.status)` → `success` (Succeeded/Completed), `failure` (Failed), `error` (None — anulowanie, timeout).
+
+Pozostałe params: `repo-url`, `revision` (pełny SHA — statusy nie przyjmują nazw tagów, dlatego `.tekton/release.yaml` statusów nie ustawia), `pipeline-run` (`$(context.pipelineRun.name)`), `status-context` (np. `tekton/homebudget-ci`).
+
+**Problem z GitHubem nie przerywa pipeline'u** (sieć, 5xx, zły token → ostrzeżenie w logu, exit 0). Brak sekretu `github-status-token` przerywa — pod nie wystartuje — bo to błąd konfiguracji platformy.
+
+Sekret `github-status-token` (klucz `token`) to fine-grained PAT z uprawnieniem **Commit statuses: Read and write**, ograniczony do wybranych repozytoriów (na start: `jabbas/homebudget`). Kolejne repo = dopisanie go do listy repozytoriów tego samego PAT-a na GitHubie, bez nowego sekretu.
+
+**Twarde anulowanie** (`spec.status: Cancelled`) pomija `finally` — status zostaje `pending`. Anuluj przez `CancelledRunFinally`.
 
 ## Poświadczenia do pushu — używaj sprawdzonej metody
 
@@ -109,7 +130,7 @@ Stan od planu 2 (automatyczne wydawanie, 2026-10-20):
    - `${image-prefix}-web` — kontekst `frontend/`
    - `${image-prefix}-storage-init` — `docker/storage-init.Containerfile`; używany przez chart (provisioning storage), nie tylko przez stos deweloperski
 3. Podział pipeline'ów:
-   - `.tekton/pipeline.yaml` (`homebudget-ci`, push do `main`) — tylko `clone` + `test`, **nie publikuje obrazów**; parametr `image-prefix` zadeklarowany dla zgodności z `build-from-repo`, nieużywany.
+   - `.tekton/pipeline.yaml` (`homebudget-ci`, push do `main` i PR-y z gałęzi repo) — `clone` + `test` + `test-web` oraz status commita `tekton/homebudget-ci` (`report-start`, `report-result`), **nie publikuje obrazów**; parametr `image-prefix` zadeklarowany dla zgodności z `build-from-repo`, nieużywany.
    - `.tekton/release.yaml` (`homebudget-release`, tag `X.Y.Z`) — trzy buildy równolegle po `test`, potem chart.
 4. Chart `helm/` ma w repo na stałe `version: 0.0.0` / `appVersion: "0.0.0"`; prawdziwą wersję wstrzykuje `helm package --version/--app-version` w pipeline'ie wydania.
 
@@ -268,8 +289,9 @@ Konsekwencja praktyczna: **push bez tagu (po samym digeście) zniknie po godzini
 
 Dla porządku, gdy przyjdzie następna aplikacja — po stronie `flux-home-system`:
 
-1. wpis w allowliście CEL w `flux/infrastructure/tekton/ci/eventlistener.yaml`
+1. wpis w allowliście CEL w `flux/infrastructure/tekton/ci/eventlistener.yaml` (`github-push` i `github-pull-request`)
 2. `ServiceAccount build-<repo>` w `rbac.yaml`
-3. webhook na GitHubie z tym samym sekretem HMAC
+3. webhook na GitHubie z tym samym sekretem HMAC, zdarzenia `push` i `pull_request`
+4. jeśli pipeline ustawia statusy: dopisanie repo do PAT-a z `github-status-token` (na GitHubie)
 
 **Nowy token nie jest potrzebny** — `github-pat-readonly` jest read-only na wszystkie repozytoria.

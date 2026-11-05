@@ -1,0 +1,157 @@
+---
+# Status commita na GitHubie (Commit Statuses API) dla PipelineRunow z ns ci.
+#
+# Wspolny Task platformy, a nie inline w repo aplikacji, bo wszystko, czego
+# potrzebuje, nalezy do platformy: token `github-status-token`, adres
+# dashboardu Tektona (target_url) i nazwa namespace'u. Pipeline aplikacji
+# podaje tylko, CO zglosic:
+#
+#   tasks:                                   # na poczatku, rownolegle z clone
+#     - name: report-start
+#       taskRef: {name: github-commit-status}
+#       params: [..., {name: pipeline-status, value: Started}]
+#   finally:                                 # zawsze, takze po porazce
+#     - name: report-result
+#       taskRef: {name: github-commit-status}
+#       params: [..., {name: pipeline-status, value: $(tasks.status)}]
+#
+# Mapowanie `pipeline-status` -> stan GitHuba:
+#   Started              -> pending
+#   Succeeded, Completed -> success   (Completed = sukces z pominietymi taskami)
+#   Failed               -> failure
+#   cokolwiek innego     -> error     (None = anulowany / timeout / nieznany)
+#
+# Kontrakt: docs/plans/2026-09-09-tekton-pipeline-contract.md, sekcja
+# "Status commita na GitHubie".
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: github-commit-status
+  namespace: ci
+spec:
+  description: >-
+    Ustawia status commita `revision` na GitHubie (kontekst `status-context`)
+    z linkiem do PipelineRunu w dashboardzie Tektona. Blad GitHuba NIE
+    przerywa pipeline'u — konczy sie ostrzezeniem w logu.
+  params:
+    - name: repo-url
+      type: string
+      description: Adres HTTPS repozytorium (https://github.com/<owner>/<repo>.git).
+    - name: revision
+      type: string
+      description: Pelny SHA commita (40 znakow hex). Statusy GitHuba nie przyjmuja nazw galezi ani tagow.
+    - name: pipeline-status
+      type: string
+      description: "`Started` na poczatku pipeline'u albo zagregowany status taskow (tasks.status) w finally."
+    - name: pipeline-run
+      type: string
+      description: Nazwa PipelineRunu (context.pipelineRun.name) — do linku w dashboardzie.
+    - name: status-context
+      type: string
+      description: Kontekst statusu na GitHubie, np. `tekton/homebudget-ci`.
+  steps:
+    # curlimages/curl 8.23.0 — ten sam obraz i digest INDEKSU
+    # wieloarchitekturowego co krok `guard` w .tekton/release.yaml homebudgetu.
+    - name: set-status
+      image: curlimages/curl:8.23.0@sha256:a134550be58ab783810e613ae96fd253c38f7bdd16d9bf9be350700c7a29ac06
+      # Skrypt czyta wartosci WYLACZNIE ze zmiennych srodowiskowych (bez
+      # podstawien Tektona w tresci skryptu).
+      env:
+        - name: REPO_URL
+          value: $(params.repo-url)
+        - name: REVISION
+          value: $(params.revision)
+        - name: PIPELINE_STATUS
+          value: $(params.pipeline-status)
+        - name: STATUS_CONTEXT
+          value: $(params.status-context)
+        # Link do PipelineRunu w dashboardzie (Ingress `tekton-dashboard` w
+        # flux/infrastructure/tekton/dashboard/ingress.yaml). Dashboard jest
+        # wewnetrzny (traefik-internal + Authentik) — link z GitHuba dziala
+        # tylko z sieci domowej.
+        - name: TARGET_URL
+          value: https://tekton.dev.home/#/namespaces/$(context.taskRun.namespace)/pipelineruns/$(params.pipeline-run)
+        # Fine-grained PAT: tylko repo homebudget, uprawnienie "Commit
+        # statuses: Read and write". Brak sekretu = pod nie wystartuje
+        # (CreateContainerConfigError) i pipeline padnie glosno — to blad
+        # konfiguracji platformy, a nie chwilowa niedostepnosc GitHuba.
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-status-token
+              key: token
+      computeResources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+      script: |
+        #!/bin/sh
+        # Bez `set -e` i bez `set -x`: kazdy blad jest obslugiwany jawnie
+        # nizej, a `-x` wypisalby token do logu.
+        set -u
+
+        # CELOWO exit 0 przy kazdym problemie z GitHubem (siec, 5xx, 401/403
+        # zlego tokenu, 422): status commita to informacja dla PR-a, a nie
+        # wynik testow. Niedostepny GitHub nie moze zamienic zielonych testow
+        # w czerwony PipelineRun ani zatrzymac testow przed startem.
+        # Problem jest widoczny jako ostrzezenie w logu tego kroku.
+        warn() {
+          echo "OSTRZEZENIE: status commita NIE zostal ustawiony: $*" >&2
+          exit 0
+        }
+
+        case "$PIPELINE_STATUS" in
+          Started)             STATE=pending; DESCRIPTION="Testy w toku" ;;
+          Succeeded|Completed) STATE=success; DESCRIPTION="Testy przeszły" ;;
+          Failed)              STATE=failure; DESCRIPTION="Testy nie przeszły" ;;
+          *)                   STATE=error;   DESCRIPTION="Pipeline przerwany (status: $PIPELINE_STATUS)" ;;
+        esac
+
+        if ! echo "$REVISION" | grep -Eq '^[0-9a-f]{40}$'; then
+          warn "revision '$REVISION' to nie pelny SHA commita"
+        fi
+
+        # https://github.com/<owner>/<repo>.git -> <owner>/<repo>
+        REPOSITORY=${REPO_URL#https://github.com/}
+        REPOSITORY=${REPOSITORY%.git}
+        if ! echo "$REPOSITORY" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then
+          warn "nie umiem wyciagnac <owner>/<repo> z '$REPO_URL'"
+        fi
+
+        # Token idzie do curla przez plik z naglowkiem (-H @plik), nie przez
+        # argument — argumenty procesu widac w `ps`. printf to builtin
+        # powloki, wiec token nie trafia do argumentow zadnego procesu.
+        # tr usuwa koncowy znak nowej linii, jesli plik z tokenem go mial.
+        umask 077
+        TOKEN=$(printf '%s' "$GITHUB_TOKEN" | tr -d '[:space:]')
+        printf 'Authorization: Bearer %s\n' "$TOKEN" > /tmp/authorization-header
+        unset TOKEN GITHUB_TOKEN
+
+        BODY=$(printf '{"state":"%s","target_url":"%s","description":"%s","context":"%s"}' \
+          "$STATE" "$TARGET_URL" "$DESCRIPTION" "$STATUS_CONTEXT")
+
+        echo "==> $REPOSITORY@$REVISION: $STATUS_CONTEXT = $STATE ($DESCRIPTION)"
+
+        # --retry ponawia bledy przejsciowe (timeout, 429, 5xx); 4xx nie.
+        HTTP_CODE=$(curl --silent --show-error \
+          --max-time 20 --retry 3 \
+          --request POST \
+          --header @/tmp/authorization-header \
+          --header 'Accept: application/vnd.github+json' \
+          --header 'X-GitHub-Api-Version: 2022-11-28' \
+          --data "$BODY" \
+          --output /tmp/response.json \
+          --write-out '%{http_code}' \
+          "https://api.github.com/repos/$REPOSITORY/statuses/$REVISION")
+        CURL_EXIT=$?
+
+        if [ "$CURL_EXIT" -ne 0 ]; then
+          warn "curl zakonczyl sie kodem $CURL_EXIT (HTTP $HTTP_CODE)"
+        fi
+        if [ "$HTTP_CODE" != "201" ]; then
+          # Odpowiedz GitHuba z bledem nie zawiera tokenu — mozna ja pokazac.
+          cat /tmp/response.json >&2
+          echo >&2
+          warn "GitHub odpowiedzial HTTP $HTTP_CODE"
+        fi
+        echo "    ustawiony"
