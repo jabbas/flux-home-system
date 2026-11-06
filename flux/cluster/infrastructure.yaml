@@ -454,5 +454,3 @@ spec:
   path: ./flux/infrastructure/secretspec-operator
   dependsOn:
     - name: sources
-    # ServiceMonitor CRD (prometheus-operator-crds) and the vmagent converter
-    - name: victoria-metrics

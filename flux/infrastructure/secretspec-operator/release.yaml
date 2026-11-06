@@ -14,7 +14,9 @@ spec:
 
   install:
     remediation:
-      retries: 3
+      # Unlimited: on a fresh cluster the install fails until the ServiceMonitor
+      # CRD exists (see serviceMonitor below), so keep retrying instead of giving up.
+      retries: -1
 
   upgrade:
     remediation:
@@ -43,6 +45,9 @@ spec:
     # Scraped by vmagent: the VictoriaMetrics operator converts ServiceMonitors
     # (prometheus converter enabled, vmagent selectAllByDefault) - no selector
     # labels needed. The CRD comes from prometheus-operator-crds in the
-    # victoria-metrics Kustomization, hence dependsOn there.
+    # victoria-metrics Kustomization. There is deliberately no dependsOn on it:
+    # that would make every push wait for the whole victoria-metrics chain.
+    # Instead install.remediation.retries is unlimited, so a from-scratch
+    # install succeeds once the CRD appears.
     serviceMonitor:
       enabled: true
