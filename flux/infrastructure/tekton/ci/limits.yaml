@@ -1,0 +1,52 @@
+---
+# Ograniczenie CPU dla CI. Powod: 2026-11-06 23:10-23:28 UTC ~18 rownoleglych
+# PipelineRunow homebudget zajelo 20-35 rdzeni, CPU hosta pve.home doszlo do
+# 95-99% (20 watkow na 3 x 18 vCPU Talosa), etcd mial opoznienia 7-12 s i
+# zrestartowaly sie kube-apiserver, kube-scheduler i kontrolery Flux
+# (docs/plans/2026-11-04-etcd-niestabilnosc-zgloszenie.md).
+#
+# LimitRange daje kazdemu kontenerowi BEZ wlasnych ustawien:
+#   - limit 4 rdzeni: najciezszy krok (vitest --maxWorkers=4 w test-web)
+#     miesci sie w nim; bez limitu jeden pod bral do ~9 rdzeni,
+#   - request 250m: potrzebny, bo ResourceQuota na requests.cpu wymaga
+#     requestu w kazdym kontenerze. Tekton dzieli defaultRequest miedzy kroki
+#     bez wlasnych requestow, wiec pod zada tyle, ile realnie potrzebuje.
+# Pamieci celowo nie ograniczamy - problemem byl CPU, a limit pamieci grozi
+# OOM-killem bez czytelnego komunikatu w CI.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ci-cpu-defaults
+  namespace: ci
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "4"
+      defaultRequest:
+        cpu: 250m
+---
+# Kolejka zamiast przeciazenia. Kwota liczy tylko REQUESTY - zgodnie z
+# dokumentacja Tektona (compute-resources.md, "ResourceQuota Support"):
+# Kubernetes sumuje limity wszystkich krokow poda, chociaz Tekton uruchamia je
+# po kolei, wiec kwota na limits blokowalaby pody z wieloma krokami.
+#
+# Gdy kwota nie pozwala utworzyc poda, Tekton NIE oblewa TaskRunu: ustawia
+# powod ExceededResourceQuota i ponawia co minute
+# (pkg/reconciler/taskrun/taskrun.go, handlePodCreationError).
+#
+# 10 rdzeni requestow: stale ~0,5 (buildkitd 200m, el-github 250m) plus
+# PipelineRun homebudget w fazie testow ~4,2 (test-web: vitest 2 + reszta;
+# test: pytest 1 + sidecary 0,35 + reszta; affinity assistant 250m), czyli
+# ~2 przebiegi testow naraz. Rzeczywiste uzycie przy dwoch przebiegach
+# ~10 rdzeni (limity 4 rdzeni na krok), reszta hosta zostaje dla etcd.
+# Koszt: kolejne PipelineRuny czekaja; przy wielu naraz moga dojsc do
+# timeoutu PipelineRunu (domyslnie 1h, release 1h30m).
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ci-cpu
+  namespace: ci
+spec:
+  hard:
+    requests.cpu: "10"
