@@ -94,7 +94,7 @@
       controlpane:
         cpu:
           type: "host"
-          cores: 18
+          cores: 6
           shares: 1000
         memory:
           balloon: 0
