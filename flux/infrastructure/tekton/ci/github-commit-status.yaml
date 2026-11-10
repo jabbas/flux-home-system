@@ -63,6 +63,20 @@ spec:
     - name: status-context
       type: string
       description: Kontekst statusu na GitHubie, np. `tekton/homebudget-ci`.
+    # Opisy stanow pending/success/failure — opcjonalne, domyslne pasuja do
+    # pipeline'u testow (CI). Pipeline wydania podaje wlasne („Wydanie …”),
+    # zeby status na GitHubie nie mowil „Testy przeszly” o weryfikacji
+    # produkcji. Opis NIE moze zawierac `"` ani `\` (JSON skladany recznie
+    # nizej) i ma maks. 140 znakow (limit GitHuba).
+    - name: description-pending
+      type: string
+      default: Testy w toku
+    - name: description-success
+      type: string
+      default: Testy przeszły
+    - name: description-failure
+      type: string
+      default: Testy nie przeszły
   steps:
     # curlimages/curl 8.23.0 — ten sam obraz i digest INDEKSU
     # wieloarchitekturowego co krok `guard` w .tekton/release.yaml homebudgetu.
@@ -79,6 +93,12 @@ spec:
           value: $(params.task-statuses)
         - name: STATUS_CONTEXT
           value: $(params.status-context)
+        - name: DESCRIPTION_PENDING
+          value: $(params.description-pending)
+        - name: DESCRIPTION_SUCCESS
+          value: $(params.description-success)
+        - name: DESCRIPTION_FAILURE
+          value: $(params.description-failure)
         # Link do PipelineRunu w dashboardzie (Ingress `tekton-dashboard` w
         # flux/infrastructure/tekton/dashboard/ingress.yaml). Dashboard jest
         # wewnetrzny (traefik-internal + Authentik) — link z GitHuba dziala
@@ -122,13 +142,13 @@ spec:
         # Kolejnosc ma znaczenie: Failed wygrywa z None (np. clone Failed,
         # a testy pominiete = None -> to jest porazka, nie przerwanie).
         if [ "$STATUS_LINES" = "Started" ]; then
-          STATE=pending; DESCRIPTION="Testy w toku"
+          STATE=pending; DESCRIPTION="$DESCRIPTION_PENDING"
         elif [ -z "$STATUS_LINES" ]; then
           STATE=error;   DESCRIPTION="Brak statusow taskow"
         elif echo "$STATUS_LINES" | grep -qx Failed; then
-          STATE=failure; DESCRIPTION="Testy nie przeszły"
+          STATE=failure; DESCRIPTION="$DESCRIPTION_FAILURE"
         elif [ -z "$NOT_SUCCEEDED" ]; then
-          STATE=success; DESCRIPTION="Testy przeszły"
+          STATE=success; DESCRIPTION="$DESCRIPTION_SUCCESS"
         else
           STATE=error;   DESCRIPTION="Pipeline przerwany (statusy: $TASK_STATUSES)"
         fi

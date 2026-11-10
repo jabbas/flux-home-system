@@ -41,7 +41,7 @@ spec:
 # ~2 przebiegi testow naraz. Rzeczywiste uzycie przy dwoch przebiegach
 # ~10 rdzeni (limity 4 rdzeni na krok), reszta hosta zostaje dla etcd.
 # Koszt: kolejne PipelineRuny czekaja; przy wielu naraz moga dojsc do
-# timeoutu PipelineRunu (domyslnie 1h, release 1h30m).
+# timeoutu PipelineRunu (domyslnie 1h, release 1h55m).
 apiVersion: v1
 kind: ResourceQuota
 metadata:

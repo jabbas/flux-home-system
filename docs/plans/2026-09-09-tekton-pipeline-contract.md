@@ -82,7 +82,7 @@ Dodane 2026-11-05. Platforma daje Task `github-commit-status` (`flux/infrastruct
 
 Oba wywołania z **`onError: continue`** na PipelineTasku, a w `task-statuses` **nie** `$(tasks.status)` — ten agreguje też `report-start`. Raportowanie nie może ani zatrzymać testów, ani zmienić wyniku PipelineRunu, ani zafałszować zgłaszanego stanu.
 
-Pozostałe params: `repo-url`, `revision` (pełny SHA — statusy nie przyjmują nazw tagów, dlatego `.tekton/release.yaml` statusów nie ustawia), `pipeline-run` (`$(context.pipelineRun.name)`), `status-context` (np. `tekton/homebudget-ci`).
+Pozostałe params: `repo-url`, `revision` (pełny SHA — statusy nie przyjmują nazw tagów; pipeline wydania najpierw zamienia tag na SHA commita), `pipeline-run` (`$(context.pipelineRun.name)`), `status-context` (np. `tekton/homebudget-ci`). Opcjonalne (dodane 2026-11-10): `description-pending`, `description-success`, `description-failure` — opisy stanów; domyślne („Testy w toku”, „Testy przeszły”, „Testy nie przeszły”) pasują do CI, pipeline wydania podaje własne. Bez `"` i `\`, maks. 140 znaków.
 
 **Problem z GitHubem nie przerywa pipeline'u** (sieć, 5xx, zły token → ostrzeżenie w logu, exit 0). Brak sekretu `github-status-token` daje czerwony TaskRun raportowania (pod nie wystartuje), ale dzięki `onError: continue` nie zmienia wyniku PipelineRunu.
 
@@ -133,7 +133,7 @@ Stan od planu 2 (automatyczne wydawanie, 2026-10-20):
    - `${image-prefix}-storage-init` — `docker/storage-init.Containerfile`; używany przez chart (provisioning storage), nie tylko przez stos deweloperski
 3. Podział pipeline'ów:
    - `.tekton/pipeline.yaml` (`homebudget-ci`, push do `main` i PR-y z gałęzi repo) — `clone` + `test` + `test-web` oraz status commita `tekton/homebudget-ci` (`report-start`, `report-result`), **nie publikuje obrazów**; parametr `image-prefix` zadeklarowany dla zgodności z `build-from-repo`, nieużywany.
-   - `.tekton/release.yaml` (`homebudget-release`, tag `X.Y.Z`) — trzy buildy równolegle po `test`, potem chart.
+   - `.tekton/release.yaml` (`homebudget-release`, tag `X.Y.Z`) — trzy buildy równolegle po `test`, potem chart, na końcu `verify-production` (czeka do 10 min, aż produkcja działa na nowej wersji); wynik jako status commita `tekton/homebudget-release` na commicie tagu. Uprawnienie do odczytu HelmReleasu i Deploymentów w namespace `homebudget` daje Role w flux-homeapps (`applications/homebudget/ci-access.yaml`) — nie tutaj, bo namespace `homebudget` tworzy dopiero Kustomization `applications`, a obiekt w nieistniejącym namespace zablokowałby bootstrap całego `tekton-ci`.
 4. Chart `helm/` ma w repo na stałe `version: 0.0.0` / `appVersion: "0.0.0"`; prawdziwą wersję wstrzykuje `helm package --version/--app-version` w pipeline'ie wydania.
 
 ## Wydanie (release)
@@ -146,7 +146,7 @@ Dodane 2026-10-20 (homebudget, plan 2 „automatyczne wydawanie”). Wydanie wyz
 push tagu refs/tags/X.Y.Z
   → EventListener `github`, trigger github-tag (HMAC + CEL)
   → TriggerBinding github-tag → TriggerTemplate release-from-repo
-  → PipelineRun release-<repo>-* (SA build-<repo>, timeouts.pipeline 1h30m)
+  → PipelineRun release-<repo>-* (SA build-<repo>, timeouts: pipeline 1h55m, tasks 1h45m, finally 10m)
   → git resolver: .tekton/release.yaml z rewizji = nazwa tagu
 ```
 

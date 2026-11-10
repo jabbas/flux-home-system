@@ -130,7 +130,7 @@ spec:
 ---
 # Szablon PipelineRunu WYDANIA (tag semver X.Y.Z). Kopia build-from-repo z
 # roznicami: pipeline pobierany z .tekton/release.yaml (z rewizji = nazwy
-# tagu), dodatkowe params `version` i `chart-repo`, dluzszy timeout.
+# tagu), dodatkowe params `version` i `chart-repo`, dluzsze timeouty.
 # Kontrakt: docs/plans/2026-09-09-tekton-pipeline-contract.md, sekcja
 # "Wydanie (release)".
 apiVersion: triggers.tekton.dev/v1beta1
@@ -155,10 +155,19 @@ spec:
         generateName: release-$(tt.params.repo-name)-
         namespace: ci
       spec:
-        # Suma timeoutow taskow .tekton/release.yaml (guard, clone, test,
-        # buildy, publish-chart) przekracza domyslna godzine.
+        # Suma timeoutow taskow na sciezce krytycznej .tekton/release.yaml:
+        # guard 5 (rownolegle z resolve-commit 5) + clone 10 + test 30 +
+        # build 30 + publish-chart 15 + verify-production 15 = 105 min
+        # -> `tasks`. `finally` (report-result, timeout 5m + zapas na pod w
+        # Pending) ma WLASNY budzet: bez niego task, ktory wisi do konca
+        # `tasks`, zjadlby czas finally i status na GitHubie zostalby
+        # `pending`. `pipeline` = tasks + finally (Tekton wymaga, zeby suma
+        # nie przekraczala `pipeline`). Podnoszac timeout tasku w
+        # release.yaml, podnies najpierw `tasks` i `pipeline` tutaj.
         timeouts:
-          pipeline: 1h30m
+          pipeline: 1h55m
+          tasks: 1h45m
+          finally: 10m
         taskRunTemplate:
           serviceAccountName: build-$(tt.params.repo-name)
         pipelineRef:
