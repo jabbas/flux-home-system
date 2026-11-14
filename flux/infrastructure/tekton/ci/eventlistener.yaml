@@ -81,6 +81,23 @@ spec:
         generateName: build-$(tt.params.repo-name)-
         namespace: ci
       spec:
+        # Kolejka kwoty CPU (ResourceQuota `ci-cpu`, limits.yaml): pod
+        # odrzucony przez kwote czeka jako ExceededResourceQuota i Tekton
+        # ponawia go co minute, bez kolejnosci FIFO. Timeout TASKU tego
+        # czasu nie liczy (StartTime TaskRunu jest zerowany), timeouty
+        # PipelineRunu tak. Po kilku szybkich merge'ach (2026-11-14: 14
+        # runow naraz) domyslna 1h (config-defaults) nie wystarczala.
+        # Wlasne budzety taskow w .tekton/pipeline.yaml homebudgetu to
+        # report-start 5 (rownolegle) + clone 5 + test 30 (test-web 20
+        # rownolegle) = 35 min, reszta `tasks` to zapas na kolejke.
+        # `finally` (report-result, timeout 5m + zapas na pod w kolejce) ma
+        # WLASNY budzet, jak w release-from-repo: bez niego run, ktory
+        # przeczekal w kolejce cale `tasks`, nie zdazylby zglosic wyniku i
+        # status na GitHubie zostalby `pending`. `pipeline` = tasks + finally.
+        timeouts:
+          pipeline: 2h
+          tasks: 1h50m
+          finally: 10m
         taskRunTemplate:
           # SA per repozytorium — tworzone osobno, dopiero gdy repo istnieje.
           serviceAccountName: build-$(tt.params.repo-name)
@@ -156,17 +173,19 @@ spec:
         namespace: ci
       spec:
         # Suma timeoutow taskow na sciezce krytycznej .tekton/release.yaml:
-        # guard 5 (rownolegle z resolve-commit 5) + clone 10 + test 30 +
-        # build 30 + publish-chart 15 + verify-production 15 = 105 min
-        # -> `tasks`. `finally` (report-result, timeout 5m + zapas na pod w
-        # Pending) ma WLASNY budzet: bez niego task, ktory wisi do konca
+        # guard 5 (rownolegle z resolve-commit 5) + wait-for-ci 50
+        # (rownolegle z clone 10; czeka na wynik CI tego samego commita) +
+        # test 30 + build 30 + publish-chart 15 + verify-production 15 =
+        # 145 min -> `tasks`. `finally` (report-result albo
+        # report-result-without-tests, timeout 5m + zapas na pod w Pending)
+        # ma WLASNY budzet: bez niego task, ktory wisi do konca
         # `tasks`, zjadlby czas finally i status na GitHubie zostalby
         # `pending`. `pipeline` = tasks + finally (Tekton wymaga, zeby suma
         # nie przekraczala `pipeline`). Podnoszac timeout tasku w
         # release.yaml, podnies najpierw `tasks` i `pipeline` tutaj.
         timeouts:
-          pipeline: 1h55m
-          tasks: 1h45m
+          pipeline: 2h35m
+          tasks: 2h25m
           finally: 10m
         taskRunTemplate:
           serviceAccountName: build-$(tt.params.repo-name)

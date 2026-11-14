@@ -35,13 +35,19 @@ spec:
 # powod ExceededResourceQuota i ponawia co minute
 # (pkg/reconciler/taskrun/taskrun.go, handlePodCreationError).
 #
-# 10 rdzeni requestow: stale ~0,5 (buildkitd 200m, el-github 250m) plus
-# PipelineRun homebudget w fazie testow ~4,2 (test-web: vitest 2 + reszta;
-# test: pytest 1 + sidecary 0,35 + reszta; affinity assistant 250m), czyli
-# ~2 przebiegi testow naraz. Rzeczywiste uzycie przy dwoch przebiegach
-# ~10 rdzeni (limity 4 rdzeni na krok), reszta hosta zostaje dla etcd.
+# 10 rdzeni requestow: stale ~0,45 (buildkitd 200m, el-github 250m) plus
+# PipelineRun homebudget w fazie testow ~3,5 (test-web 1,686: vitest 1,5 +
+# 3 x 62m; test 1,75: pytest 1 + sidecary 0,65 + wait-and-provision 0,1;
+# affinity assistant 50m), czyli ~2,7 przebiegu testow naraz. Rzeczywiste
+# uzycie bywa wyzsze niz requesty (vitest szczytowo do ~3,6 rdzenia, limit 4
+# na krok), ale srednio jest blisko nich. Wydanie po zielonym CI tego samego
+# commita testow nie powtarza (wait-for-ci w .tekton/release.yaml
+# homebudgetu). Nawet pod z krokiem na 10m liczy sie w kwocie jako 250m -
+# tyle zadaja kontenery init Tektona (prepare, place-scripts) z
+# defaultRequest, a kwota bierze wieksza z wartosci: najwiekszy init albo
+# suma kontenerow.
 # Koszt: kolejne PipelineRuny czekaja; przy wielu naraz moga dojsc do
-# timeoutu PipelineRunu (domyslnie 1h, release 1h55m).
+# timeoutu PipelineRunu (CI 2h, release 2h35m - eventlistener.yaml).
 apiVersion: v1
 kind: ResourceQuota
 metadata:
