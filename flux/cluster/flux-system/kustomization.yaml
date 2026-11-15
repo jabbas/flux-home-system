@@ -6,7 +6,7 @@ resources:
   - gotk-sync.yaml
 # Łańcuch dependsOn w infrastructure.yaml ma 6 poziomów. Przy domyślnym
 # --requeue-dependency=30s każdy poziom czeka do 30 s, więc nowa rewizja
-# dochodziła do grafany i secretspec-operatora po ~2 min (pomiar 2026-11-02).
+# dochodziła do grafany i generated-secrets-operatora po ~2 min (pomiar 2026-11-02).
 patches:
   - patch: |
       - op: add

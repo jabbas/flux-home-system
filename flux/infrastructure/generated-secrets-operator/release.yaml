@@ -1,16 +1,16 @@
 ---
 # Flux does not verify signatures for HTTP Helm repositories. The chart tgz
 # served from the `jabbas` HelmRepository is byte-identical to the cosign-signed
-# OCI chart ghcr.io/jabbas/charts/secretspec-operator; the verification recipe
-# is in docs/installation.md in the secretspec-operator repository.
+# OCI chart ghcr.io/jabbas/charts/generated-secrets-operator; the verification
+# recipe is in docs/installation.md in the generated-secrets-operator repository.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: secretspec-operator
-  namespace: secretspec-system
+  name: generated-secrets-operator
+  namespace: generated-secrets-system
 spec:
   interval: 30m
-  releaseName: secretspec-operator
+  releaseName: generated-secrets-operator
 
   install:
     remediation:
@@ -24,8 +24,8 @@ spec:
 
   chart:
     spec:
-      chart: secretspec-operator
-      version: "0.1.5"
+      chart: generated-secrets-operator
+      version: "0.2.0-rc.2"
       reconcileStrategy: ChartVersion
       sourceRef:
         kind: HelmRepository
@@ -33,13 +33,13 @@ spec:
         namespace: flux-system
 
   values:
-    # Cluster mode: watch SecretSpecs in all namespaces (ClusterRole).
+    # Cluster mode: watch GeneratedSecrets in all namespaces (ClusterRole).
     watchNamespaces: []
 
     crds:
-      # Chart renders the SecretSpec CRD ...
+      # Chart renders the GeneratedSecret CRD ...
       install: true
-      # ... and keeps it (with every SecretSpec) on uninstall.
+      # ... and keeps it (with every GeneratedSecret) on uninstall.
       keep: true
 
     # Scraped by vmagent: the VictoriaMetrics operator converts ServiceMonitors
