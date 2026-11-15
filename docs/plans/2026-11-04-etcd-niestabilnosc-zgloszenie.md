@@ -79,6 +79,7 @@ Ograniczenia dowodów: bufor logów etcd w Talosie sięga tylko ~19 godzin wstec
 | 2026-11-05 | vzdump: `exclude 202,300` → `202,300,401,402,403`; `fleecing 0` → `enabled=1,storage=local-zfs`. Usunięte archiwa VM 401–403 (~47 GB). | kopia `/root/jobs.cfg.bak-2026-11-05` |
 | 2026-11-05 | `vm.watermark_boost_factor` 15000 → 0 (`/etc/sysctl.d/90-watermark-boost.conf`). Szczegóły w sekcji „Dlaczego host przenosił pamięć do swapu przy wolnym RAM”. | usunąć plik, `sysctl -w vm.watermark_boost_factor=15000` |
 | 2026-11-05 | zswap włączony (`lz4`, `max_pool_percent=20`), na stałe przez `/etc/tmpfiles.d/zswap.conf`. Strony wypychane przez `kswapd` trafiają do skompresowanego RAM zamiast na dysk swapu za Thunderboltem. Obejście do czasu pakietu ZFS z poprawką. | `echo 0 > /sys/module/zswap/parameters/enabled`, usunąć plik |
+| 2026-11-15 | vzdump: `bwlimit 102400` (100 MiB/s). Szczegóły w sekcji „Nocne incydenty: zapis backupu przeciąża pulę”. | kopia `/root/jobs.cfg.bak-2026-11-15` |
 | 2026-11-13 | vzdump: wykluczony też LXC 1001 ai-proxy (wyłączony przez właściciela 2026-11-06, ma zostać wyłączony). Bez związku z etcd; dwa ostatnie archiwa zostają jako ostatni stan. | kopia `/root/jobs.cfg.bak-2026-11-13` |
 | 2026-11-11 | vzdump: wykluczona VM 802 maksbuntu (eksperymentalna), `exclude 202,300,401,402,403,802`. Jej backup (dysk 64 GB, archiwum ~33–42 GB, ~250 MB/s na tę samą pulę NVMe) dawał iowait hosta do 19–33% i 99. percentyl etcd 5,5–9,7 s w nocach 8–11.11, z restartami `kube-controller-manager`/`kube-scheduler` 9.11 02:14 i 11.11 02:16 UTC. Swap nie miał udziału (zswap bez zapisów na dysk). | kopia `/root/jobs.cfg.bak-2026-11-11` |
 | 2026-11-08 | VM 103 hassio: RAM 16384 → 8192 MB (balon min 4096 bez zmian), zastosowane przy wyłączeniu VM przez właściciela. Pomiar `@ha` przez API Supervisora: kontenery ~2,4 GB, szacowany zestaw roboczy 3–3,5 GB, szczyt 4–4,5 GB; reszta 16 GB to pamięć podręczna gościa, którą host wypchnął do swapu (10,8 GB). Po restarcie swap procesu hassio 0, wolny swap hosta 1,0 → 11,7 GB, HA odpowiada po ~110 s. | `qm set 103 --memory 16384` i restart VM |
@@ -133,6 +134,32 @@ To znany błąd jądra 7.0 w połączeniu z OpenZFS 2.4.x:
 **Docelowe rozwiązanie:** aktualizacja pakietu ZFS Proxmoxa zawierającego commit
 `a0c443a`, potem restart hosta (wykonuje właściciel). Własny moduł przez DKMS odrzucony:
 ZFS jest głównym systemem plików hosta. Do tego czasu zswap ogranicza skutki.
+
+### Nocne incydenty: zapis backupu przeciąża pulę (pomiar 2026-11-15)
+
+Po wykluczeniu VM 802 szczyty nie zniknęły: 12–15.11 99. percentyl etcd 6,7 / 21,3 / 11,1 /
+28,5 s, z restartami `kube-apiserver`, `kube-controller-manager` i `kube-scheduler`, zawsze w
+ostatnich ~3 minutach kopii VM 103 hassio (~02:06–02:10 UTC). Swap nie miał udziału.
+
+Pomiar 15.11 (co 5 s: `/proc/spl/kstat/zfs/rpool/txgs` i `zpool iostat -l rpool 5`):
+
+| Czas (UTC) | Danych w transakcji (txg) | Czas zatwierdzania | etcd p99 |
+|---|---|---|---|
+| 02:00–02:04 | 40–290 MB | 0,07–0,24 s | 42–346 ms |
+| 02:06:44–02:07:24 | 0,8–1,7 GB | 8,6–13,9 s | 1,8 s |
+| 02:07:50 | 2,7 GB | 24,3 s | 2,9 s |
+| 02:08:31–02:09:43 | 0,8–2,3 GB | 7,4–20,2 s | 28,5 s |
+| od 02:09:48 | 10–460 MB | 0,05–5 s | 148 ms (02:11) |
+
+Pula zapisywała ~100–140 MB/s przy odczycie 130–290 MB/s; dyski odpowiadały w 1–16 ms, ale
+zapisy czekały 150–280 ms w kolejkach ZFS. Zwalnianie miejsca po usuniętych archiwach
+pomijalne. Mechanizm: backup generuje więcej danych do zapisu, niż stripe dwóch NVMe bez DRAM
+zapisuje przy równoległym odczycie; ZFS spowalnia wtedy zapisy całej puli, także zvoli Talosów,
+i `fsync` etcd czeka kilkanaście sekund. To potwierdza hipotezę 1 dla incydentów nocnych.
+
+Poprawka: `bwlimit 102400`. Niepewność: dokumentacja nie mówi, czy limit liczy puste obszary
+dysku VM — jeśli tak, kopia opnsense (376 GB, 88% pustych) wydłuży się z ~5 do ~60 min.
+Docelowo kopie poza pulą NVMe.
 
 ### Incydent 2026-11-06 23:18–23:26 UTC: brak CPU, nie pamięć
 
