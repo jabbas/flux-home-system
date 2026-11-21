@@ -33,7 +33,7 @@ Agent `debugger` sprawdził stan 2026-11-04 około 21:07 czasu polskiego, czyli 
 
 Kontrola 2026-11-04 około 22:15 czasu polskiego (agent `devops`, tylko odczyt):
 
-- wszystkie 26 kustomizacji jest `Ready`, w tym `reflector`, `shared-secrets` i `victoria-metrics` (rewizja `89fd0e35`);
+- wszystkie 26 kustomizacji jest `Ready`, w tym `reflector`, `shared-secrets` i `victoria-metrics`;
 - od incydentu kontrolery Flux nie mają nowych restartów (ostatni około 21 godzin wcześniej).
 
 ## Czego nie sprawdzono
@@ -75,10 +75,12 @@ Ograniczenia dowodów: bufor logów etcd w Talosie sięga tylko ~19 godzin wstec
 | Data | Zmiana | Wycofanie |
 |---|---|---|
 | 2026-11-04 | KSM: `KSM_THRES_COEF=40` w `/etc/ksmtuned.conf` (było domyślne 20). `ksmtuned` nie widział pamięci w swapie i uważał, że RAM jest dużo. Po 5 minutach odzyskane ~3,9 GB. | kopia `/etc/ksmtuned.conf.bak-2026-11-04`, potem `systemctl restart ksmtuned` |
-| 2026-11-04 | LXC frigate (202): RAM 4096 → 6144 MB. Wyczerpywał własny limit (3 zabicia z braku pamięci) i stale korzystał z tego samego swapu na `sde`. Repozytorium `container-frigate`, commit `49ff580`. | `pct set 202 --memory 4096` |
+| 2026-11-04 | LXC frigate (202): RAM 4096 → 6144 MB. Wyczerpywał własny limit (3 zabicia z braku pamięci) i stale korzystał z tego samego swapu na `sde`. Repozytorium `container-frigate`, `frigate.vars.yaml` (`params.memory`). | `pct set 202 --memory 4096` |
 | 2026-11-05 | vzdump: `exclude 202,300` → `202,300,401,402,403`; `fleecing 0` → `enabled=1,storage=local-zfs`. Usunięte archiwa VM 401–403 (~47 GB). | kopia `/root/jobs.cfg.bak-2026-11-05` |
 | 2026-11-05 | `vm.watermark_boost_factor` 15000 → 0 (`/etc/sysctl.d/90-watermark-boost.conf`). Szczegóły w sekcji „Dlaczego host przenosił pamięć do swapu przy wolnym RAM”. | usunąć plik, `sysctl -w vm.watermark_boost_factor=15000` |
 | 2026-11-05 | zswap włączony (`lz4`, `max_pool_percent=20`), na stałe przez `/etc/tmpfiles.d/zswap.conf`. Strony wypychane przez `kswapd` trafiają do skompresowanego RAM zamiast na dysk swapu za Thunderboltem. Obejście do czasu pakietu ZFS z poprawką. | `echo 0 > /sys/module/zswap/parameters/enabled`, usunąć plik |
+| 2026-11-21 | `hostprobe` na `pve.home`: usługa systemd (`/usr/local/sbin/hostprobe`, `hostprobe.service`, `Nice=19`, klasa I/O `idle`), co 10 s jedna linia do `/var/log/hostprobe/RRRR-MM-DD.log` (UTC): `pswpin`/`pswpout`, `pgscan_kswapd`/`pgscan_direct`, zapis z zswap na dysk, wolny swap, PSI `full` I/O i pamięci, najdłuższe zatwierdzanie z 3 ostatnich transakcji ZFS. Tylko odczyt, ~3 MB/dobę, retencja 14 dni. | `systemctl disable --now hostprobe`, usunąć oba pliki i `/var/log/hostprobe` |
+| 2026-11-15 | Restart hosta na jądro 7.0.14-29 (poprawka utraty danych w KSM przy `MADV_FREE`; bez poprawki ZFS). | — |
 | 2026-11-15 | vzdump: `bwlimit 102400` (100 MiB/s). Szczegóły w sekcji „Nocne incydenty: zapis backupu przeciąża pulę”. | kopia `/root/jobs.cfg.bak-2026-11-15` |
 | 2026-11-13 | vzdump: wykluczony też LXC 1001 ai-proxy (wyłączony przez właściciela 2026-11-06, ma zostać wyłączony). Bez związku z etcd; dwa ostatnie archiwa zostają jako ostatni stan. | kopia `/root/jobs.cfg.bak-2026-11-13` |
 | 2026-11-11 | vzdump: wykluczona VM 802 maksbuntu (eksperymentalna), `exclude 202,300,401,402,403,802`. Jej backup (dysk 64 GB, archiwum ~33–42 GB, ~250 MB/s na tę samą pulę NVMe) dawał iowait hosta do 19–33% i 99. percentyl etcd 5,5–9,7 s w nocach 8–11.11, z restartami `kube-controller-manager`/`kube-scheduler` 9.11 02:14 i 11.11 02:16 UTC. Swap nie miał udziału (zswap bez zapisów na dysk). | kopia `/root/jobs.cfg.bak-2026-11-11` |
@@ -118,7 +120,7 @@ po ~150–280 MB (np. 21:45, 21:52 UTC). Pozostałe źródło to wybudzenia z ZF
 
 To znany błąd jądra 7.0 w połączeniu z OpenZFS 2.4.x:
 
-- Od jądra 6.19 `vmalloc` najpierw próbuje dużych bloków (commit jądra `a0615780`,
+- Od jądra 6.19 `vmalloc` najpierw próbuje dużych bloków (zmiana jądra
   „mm/vmalloc: request large order pages from buddy allocator”) i przy każdej nieudanej
   próbie zostawia `__GFP_KSWAPD_RECLAIM`, więc budzi `kswapd`. Nie ma ustawienia, które
   to wyłącza. Proxmox przeszedł z jądra 6.17 na 7.0, stąd problem.
@@ -126,13 +128,13 @@ To znany błąd jądra 7.0 w połączeniu z OpenZFS 2.4.x:
   przez `vmalloc`.
 - Zgłoszenia: OpenZFS [#18893](https://github.com/openzfs/zfs/issues/18893), Proxmox
   [bug 8278](https://bugzilla.proxmox.com/show_bug.cgi?id=8278).
-- Poprawka: OpenZFS [PR #19276](https://github.com/openzfs/zfs/pull/19276), commit
-  `a0c443a` (scalony 2026-10-19) — `kv_alloc()` zdejmuje `__GFP_KSWAPD_RECLAIM`. Stan na
+- Poprawka: OpenZFS [PR #19276](https://github.com/openzfs/zfs/pull/19276), „Linux: avoid
+  waking kswapd when growing vmem slabs” (scalony 2026-10-19) — `kv_alloc()` zdejmuje `__GFP_KSWAPD_RECLAIM`. Stan na
   2026-11-05: nie ma jej w ZFS 2.4.4 ani w `2.4.5-staging`; łatka do pakietu Proxmoxa
   `zfsonlinux` jest na liście pve-devel od 2026-11-04.
 
-**Docelowe rozwiązanie:** aktualizacja pakietu ZFS Proxmoxa zawierającego commit
-`a0c443a`, potem restart hosta (wykonuje właściciel). Własny moduł przez DKMS odrzucony:
+**Docelowe rozwiązanie:** jądro Proxmoxa (moduł ZFS jest w pakiecie
+`proxmox-kernel-7.0.*`, nie w `zfsutils-linux`) zawierające tę poprawkę, potem restart hosta (wykonuje właściciel). Własny moduł przez DKMS odrzucony:
 ZFS jest głównym systemem plików hosta. Do tego czasu zswap ogranicza skutki.
 
 ### Nocne incydenty: zapis backupu przeciąża pulę (pomiar 2026-11-15)
@@ -157,9 +159,18 @@ pomijalne. Mechanizm: backup generuje więcej danych do zapisu, niż stripe dwó
 zapisuje przy równoległym odczycie; ZFS spowalnia wtedy zapisy całej puli, także zvoli Talosów,
 i `fsync` etcd czeka kilkanaście sekund. To potwierdza hipotezę 1 dla incydentów nocnych.
 
-Poprawka: `bwlimit 102400`. Niepewność: dokumentacja nie mówi, czy limit liczy puste obszary
-dysku VM — jeśli tak, kopia opnsense (376 GB, 88% pustych) wydłuży się z ~5 do ~60 min.
-Docelowo kopie poza pulą NVMe.
+Poprawka: `bwlimit 102400`. Wynik (16–20.11): noce 17–20.11 bez restartów, 99. percentyl
+etcd w oknie backupu 92–103 ms; najdłuższe zatwierdzanie transakcji 1–2,8 s zamiast 24 s.
+Koszt: limit liczy też puste obszary dysku — opnsense (376 GB) kopiuje się 65 min zamiast 5,
+całe zadanie ~87 min. Docelowo kopie poza pulą NVMe.
+
+### Incydenty poza backupem po restarcie hosta (2026-11-16, 2026-11-17)
+
+16.11 00:11–00:15 UTC (p99 do 8,3 s, restarty `kube-controller-manager` i `kube-scheduler`)
+i 17.11 17:32–17:34 UTC (p99 do 7,2 s, restart `kube-controller-manager`). CI w obu oknach
+nie używało CPU. Przyczyna nieustalona; podejrzenie: swap (po restarcie w 5 dni znów ~26 GB,
+pula zswap 3655 razy przy limicie, ~3,9 GB zapisane z zswap na `sde`). RRD Proxmoxa ma po
+dobie rozdzielczość 30 min, więc od 2026-11-21 działa ciągły pomiar `hostprobe` (niżej).
 
 ### Incydent 2026-11-06 23:18–23:26 UTC: brak CPU, nie pamięć
 
@@ -181,18 +192,16 @@ skąd ~18 przebiegów naraz (seria pushy czy zdublowane wyzwalacze).
 
 ### Otwarte
 
-- Weryfikacja po kilku nocnych backupach. Pierwsza noc (5.11): backup 16 min zamiast ~27,
-  0 restartów, szczyt 99. percentyla opóźnienia apiservera do etcd 425 ms (3.11: 146 ms,
-  4.11: 87 ms) — jedna noc nie przesądza.
-- Czekamy na pakiet ZFS Proxmoxa z commitem `a0c443a` (śledzić bug 8278 i shortlog
-  `zfsonlinux`). Po aktualizacji: restart hosta przez właściciela, potem można rozważyć
-  wycofanie `vm.watermark_boost_factor=0` i zswap.
-- Weryfikacja zswap po `shrinker_enabled=N` (2026-11-06, seria o 20:19 UTC): 337 MB
-  trafiło do zswap, 0 stron zapisanych z zswap na dysk, 0 stron na `sde`; pula 121 MB
-  trzyma ~305 MB (kompresja ~2,5:1); wolny swap na dysku wzrósł z 1,4 do 7,6 GB, bo
-  goście wczytują stare strony. Do potwierdzenia przy nocnym vzdump.
-- Brak kopii etcd od chwili wykluczenia VM Talos z vzdump.
-- Pamięć hosta nadal jest przydzielona z nadmiarem. Ponad 20 GB stron gości zostaje w swapie, dopóki goście ich nie dotkną. Kolejne kroki („Phase 0” w `2026-09-24-pve-storage-redundancy-design.md`) czekają na pomiar: hassio 16 GB, rzeczywiste użycie nieznane.
+- Jądro Proxmoxa z poprawką OpenZFS PR #19276 (śledzić bug 8278 i shortlog
+  `zfsonlinux`/`pve-kernel`). Stan 2026-11-20: brak; dostępne 7.0.14-30 bez niej. Po
+  aktualizacji: restart hosta przez właściciela, potem można rozważyć wycofanie
+  `vm.watermark_boost_factor=0` i zswap.
+- Przyczyna incydentów 16.11 i 17.11 poza backupem — do ustalenia z danych `hostprobe` przy
+  następnym zdarzeniu.
+- Brak kopii etcd od chwili wykluczenia VM Talos z vzdump
+  (`docs/plans/2026-11-05-etcd-backup-implementation.md` czeka na akceptację).
+- Pamięć hosta nadal jest przydzielona z nadmiarem; swap zapełnia się w kilka dni po
+  restarcie.
 - Brak metryk etcd w VictoriaMetrics i brak alertu na swap hosta.
 
 ## Hipotezy pierwotne (zweryfikowane)
