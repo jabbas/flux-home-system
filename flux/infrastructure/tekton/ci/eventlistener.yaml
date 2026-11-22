@@ -172,20 +172,25 @@ spec:
         generateName: release-$(tt.params.repo-name)-
         namespace: ci
       spec:
-        # Suma timeoutow taskow na sciezce krytycznej .tekton/release.yaml:
-        # guard 5 (rownolegle z resolve-commit 5) + wait-for-ci 50
-        # (rownolegle z clone 10; czeka na wynik CI tego samego commita) +
-        # test 30 + build 30 + publish-chart 15 + verify-production 15 =
-        # 145 min -> `tasks`. `finally` (report-result albo
-        # report-result-without-tests, timeout 5m + zapas na pod w Pending)
-        # ma WLASNY budzet: bez niego task, ktory wisi do konca
-        # `tasks`, zjadlby czas finally i status na GitHubie zostalby
-        # `pending`. `pipeline` = tasks + finally (Tekton wymaga, zeby suma
-        # nie przekraczala `pipeline`). Podnoszac timeout tasku w
-        # release.yaml, podnies najpierw `tasks` i `pipeline` tutaj.
+        # Sum of the task timeouts on the critical path of
+        # .tekton/release.yaml: guard 5 (in parallel with resolve-commit 5)
+        # + wait-for-ci 50 (in parallel with clone 10; waits for the CI
+        # result of the same commit) + test 30 + build 30 + publish-chart 15
+        # + verify-production 40 = 170 min. `tasks` adds 30 min of margin for
+        # pods waiting on the `ci-cpu` quota (limits.yaml): PipelineRun
+        # timeouts count that wait, task timeouts do not. verify-production
+        # waits up to 35 min, because a PostgreSQL major upgrade (pre-upgrade
+        # backup, pg_upgrade, migrations) may use the whole 30-minute Flux
+        # timeout of the homebudget HelmRelease. `finally` (report-result or
+        # report-result-without-tests, timeout 5m + margin for a Pending pod)
+        # has its OWN budget: without it a task hanging until the end of
+        # `tasks` would eat the finally time and the GitHub status would stay
+        # `pending`. `pipeline` = tasks + finally (Tekton requires the sum not
+        # to exceed `pipeline`). When raising a task timeout in release.yaml,
+        # raise `tasks` and `pipeline` here first.
         timeouts:
-          pipeline: 2h35m
-          tasks: 2h25m
+          pipeline: 3h30m
+          tasks: 3h20m
           finally: 10m
         taskRunTemplate:
           serviceAccountName: build-$(tt.params.repo-name)

@@ -47,7 +47,7 @@ spec:
 # defaultRequest, a kwota bierze wieksza z wartosci: najwiekszy init albo
 # suma kontenerow.
 # Koszt: kolejne PipelineRuny czekaja; przy wielu naraz moga dojsc do
-# timeoutu PipelineRunu (CI 2h, release 2h35m - eventlistener.yaml).
+# timeoutu PipelineRunu (CI 2h, release 3h30m - eventlistener.yaml).
 apiVersion: v1
 kind: ResourceQuota
 metadata:
